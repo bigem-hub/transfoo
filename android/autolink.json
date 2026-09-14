@@ -1,0 +1,17 @@
+{
+  "root": "C:/Users/bigem/OneDrive/Desktop/Transfo/android",
+  "reactNativePath": "C:/Users/bigem/OneDrive/Desktop/Transfo/android/node_modules/react-native",
+  "dependencies": {},
+  "platforms": [
+    "android"
+  ],
+  "project": {
+    "android": {
+      "sourceDir": "app",
+      "appName": "app",
+      "packageName": "com.transfo",
+      "applicationId": "com.transfo",
+      "mainActivity": "MainActivity"
+    }
+  }
+}

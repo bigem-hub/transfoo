@@ -1,0 +1,14 @@
+# dependencies / build output
+node_modules/
+.next/
+out/
+dist/
+win-unpacked/
+*.log
+
+# env / secrets
+.env
+
+# OS
+.DS_Store
+Thumbs.db

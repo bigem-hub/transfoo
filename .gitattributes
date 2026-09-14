@@ -1,0 +1,2 @@
+website/public/downloads/*.apk filter=lfs diff=lfs merge=lfs -text
+release/Transfo-v1.1.0.apk filter=lfs diff=lfs merge=lfs -text

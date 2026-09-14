@@ -2,9 +2,12 @@ apply plugin: "com.android.application"
 apply plugin: "com.facebook.react"
 
 react {
-  // JS bundle entry & hermes
-  jsRootDir = file("..")
+  // RN project root is THIS dir (android/) — node_modules, package.json, index.js all live here,
+  // NOT the parent `Transfo/`. The plugin defaults `root` to the gradle-dir parent; set it explicitly.
+  root = rootProject.projectDir
   entryFile = file("index.js")
+  jsRootDir = rootProject.projectDir
+  cliFile = file("node_modules/react-native/cli.js")
   autolinkLibrariesWithApp()
 }
 

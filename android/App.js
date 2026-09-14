@@ -18,14 +18,23 @@ export default function App() {
   }
 
   async function pair() {
-    setStatus('Pairing with PC at '+ip+'...');
+    setStatus('Pairing with PC at '+ip+' (real handshake)...');
     try {
-      const r = await fetch('http://'+ip+':4000/api/pairing', {
-        method:'POST', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-        body: JSON.stringify({deviceName:'Android'})
+      // Step 1: initiate pairing -> get pairing code
+      const init = await fetch('http://'+ip+':4000/api/pairing', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({deviceName:'Android'})
       });
-      const j = await r.json();
-      setStatus('Paired — device '+(j.id||j.name||'registered'));
+      const initJ = await init.json();
+      const code = initJ.code; if (!code) throw new Error('no pairing code: '+JSON.stringify(initJ));
+      // Step 2: authorize pairing with Bearer JWT (from login) -> receive paired token
+      const auth = await fetch('http://'+ip+':4000/api/pairing/authorize', {
+        method:'POST', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body: JSON.stringify({code})
+      });
+      const authJ = await auth.json();
+      if (authJ.error) throw new Error('pairing auth: '+authJ.error);
+      setToken(authJ.token); // new paired token replaces login token
+      setStatus('Paired — '+authJ.deviceName+' ('+code+') token: '+authJ.token.slice(0,14)+'...');
     } catch (e) { setStatus('Pair error: '+e.message); }
   }
 

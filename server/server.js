@@ -1,4 +1,4 @@
-import { log, error } from "./diag.js"; log("Server boot");
+import { log, error } from "./lib/diag.js"; log("Server boot");
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';

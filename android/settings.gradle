@@ -1,0 +1,8 @@
+pluginManagement {
+  includeBuild(new File(["node", "-p", "require.resolve('@react-native/gradle-plugin/package.json', { paths: [rootDir.absolutePath] })"].execute(null, rootDir).text.trim()).getParentFile().toString())
+}
+plugins { id("com.facebook.react.settings") }
+extensions.configure(com.facebook.react.ReactSettingsExtension) { it.autolinkLibrariesFromCommand() }
+rootProject.name = 'Transfo'
+include ':app'
+includeBuild(new File(["node", "-p", "require.resolve('@react-native/gradle-plugin/package.json', { paths: [rootDir.absolutePath] })"].execute(null, rootDir).text.trim()).getParentFile().toString())

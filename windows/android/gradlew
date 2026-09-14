@@ -1,0 +1,8 @@
+#!/bin/bash
+# Minimal wrapper that delegates to available gradle or downloads
+if command -v gradle >/dev/null 2>&1; then
+  exec gradle "$@"
+else
+  echo "Gradle not available in PATH"
+  exit 1
+fi

@@ -20,7 +20,6 @@ function startStaticServer(port) {
 
 const isDev = !!process.env.NODE_ENV && process.env.NODE_ENV.trim().toLowerCase() === 'development';
 // In the packaged app, renderer is the Next static export shipped under `out/`.
-const rendererRoot = path.join(__dirname, 'out');
 
 function rendererPage(p = 'index.html') {
   const clean = (p || 'index.html').replace(/^\/+/, '');

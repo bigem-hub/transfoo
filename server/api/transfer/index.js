@@ -2,9 +2,22 @@
 // Honest status: implemented; NOT live-verified (server is not runnable here —
 // no node_modules / no paired device present).
 import express from 'express';
+import { verifyToken } from '../../lib/auth.js';
 import { createSession, appendChunk, getSession, listSessions, assembleFile, removeSession } from '../../lib/transfer.js';
 
 const router = express.Router();
+
+// Transfo data path is authenticated: every transfer call must carry a valid
+// JWT (Authorization: Bearer <token>). Closes the previously-open /pull stream.
+function requireAuth(req, res, next) {
+  const h = req.headers.authorization || '';
+  const t = /^Bearer\s+(.+)$/i.exec(h);
+  if (!t) return res.status(401).json({ error: 'unauthorized: missing Bearer token' });
+  try { req.user = verifyToken(t[1]); next(); }
+  catch { return res.status(401).json({ error: 'unauthorized: bad or expired token' }); }
+}
+// Apply to every transfer route (create/chunk/status/pull/delete).
+router.use(requireAuth);
 
 // POST /api/transfer/sessions  { name, size, type, chunkSize? } -> { id, chunkSize, totalChunks }
 router.post('/sessions', async (req, res) => {

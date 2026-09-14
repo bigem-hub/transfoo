@@ -11,7 +11,7 @@ function rendererPage(p = 'index.html') {
 }
 
 function createWindow() {
-  const win = new BrowserWindow({ width: 1200, height: 800, icon: path.join(__dirname, 'public', 'icon.ico') });
+  const win = new BrowserWindow({ width: 1200, height: 800, icon: path.join(__dirname, 'public', 'icon.ico'), webPreferences: { nodeIntegration: false, contextIsolation: true } });
   if (isDev) {
     win.loadURL('http://localhost:3000');
   } else {

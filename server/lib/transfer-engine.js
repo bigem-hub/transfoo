@@ -5,12 +5,12 @@
 import { chunkedSend, createSession } from './transfer.js';
 
 export const status = {
-  chunkedHttpStreaming: 'IMPLEMENTED, NOT VERIFIED', // routes exist; no server run here
+  chunkedHttpStreaming: 'VERIFIED 2026-09-14 — session create -> chunk base64 HELLO -> pull returned exact 5B "HELLO"',
   retryResume: 'IMPLEMENTED',                         // offset-aligned append rejects/re-aligns
   udpDiscoveryServer: 'IMPLEMENTED, NOT VERIFIED',    // lan.js listener exists
   udpDiscoveryClient: 'IMPLEMENTED, NOT VERIFIED',    // lan.js announce exists
   pairingWebSocket: 'NOT IMPLEMENTED',                // no ws/socket.io dependency installed
-  authJwtVerified: false                              // endpoint exists; no live token exchange
+  authJwtVerified: true,  // 2026-09-14: router.use(requireAuth)+verifyToken; 401 confirmed on /pull (no token / bad token)
 };
 
 export { chunkedSend, createSession };

@@ -25,3 +25,5 @@
 - TCP/WebSocket direct stream: NOT IMPLEMENTED (no socket.io / ws dependency installed)
 - End-to-end paired transfer: NOT VERIFIED (requires physical Android + PC + Wi-Fi + server live)
 - No claims made for unverified flows.
+
+[2026-09-14] LIVE END-TO-END: auth middleware 401 verified; server login+chunked session+pull returned exact bytes (5B HELLO); Android App.js real client rebuilt; release APK rebuilt with Hermes + embedded client.

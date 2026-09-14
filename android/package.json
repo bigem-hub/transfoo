@@ -1,0 +1,9 @@
+{
+  "name":"Transfo",
+  "version":"1.0.0",
+  "private":true,
+  "scripts":{"start":"react-native start","android":"react-native run-android","build":"cd android && ./gradlew assembleRelease"},
+  "dependencies":{"react":"18.3.1","react-native":"0.75.4"},
+  "devDependencies":{"metro-react-native-babel-preset":"*","@babel/core":"*","@babel/runtime":"*"},
+  "peerDependenciesMeta":{"metro":"optional"}
+}

@@ -8,16 +8,28 @@ export default function App() {
 
   async function login() {
     try {
+      setStatus('Logging in...');
       const r = await fetch('http://'+ip+':4000/api/auth/login', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({email:'user@t.local',password:'t'})
       });
       const j = await r.json();
-      if (j.token) { setToken(j.token); setStatus('Authenticated (token set)'); } else setStatus('Login failed: '+JSON.stringify(j));
-    } catch (e) { setStatus('Login error: '+e.message); }
+      if (j.token) {
+        setToken(j.token);
+        setStatus('Authenticated (token set)');
+      } else {
+        setStatus('Login failed: '+JSON.stringify(j));
+      }
+    } catch (e) {
+      setStatus('Login error: '+e.message);
+    }
   }
 
   async function pair() {
+    if (!token) {
+      setStatus('Please login first');
+      return;
+    }
     setStatus('Pairing with PC at '+ip+' (real handshake)...');
     try {
       // Step 1: initiate pairing -> get pairing code
@@ -25,7 +37,8 @@ export default function App() {
         method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({deviceName:'Android'})
       });
       const initJ = await init.json();
-      const code = initJ.code; if (!code) throw new Error('no pairing code: '+JSON.stringify(initJ));
+      const code = initJ.code;
+      if (!code) throw new Error('no pairing code: '+JSON.stringify(initJ));
       // Step 2: authorize pairing with Bearer JWT (from login) -> receive paired token
       const auth = await fetch('http://'+ip+':4000/api/pairing/authorize', {
         method:'POST', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
@@ -35,16 +48,21 @@ export default function App() {
       if (authJ.error) throw new Error('pairing auth: '+authJ.error);
       setToken(authJ.token); // new paired token replaces login token
       setStatus('Paired — '+authJ.deviceName+' ('+code+') token: '+authJ.token.slice(0,14)+'...');
-    } catch (e) { setStatus('Pair error: '+e.message); }
+    } catch (e) {
+      setStatus('Pair error: '+e.message);
+    }
   }
 
   async function sendFile() {
-    if (!token) { Alert.alert('Not authenticated','Run Login / Pair first'); return; }
+    if (!token) {
+      Alert.alert('Not authenticated','Run Login / Pair first');
+      return;
+    }
     setStatus('Starting chunked upload...');
     try {
       const s = await fetch('http://'+ip+':4000/api/transfer/sessions', {
         method:'POST', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-        body: JSON.stringify({filename:'hello.txt', size:5, chunkSize:256})
+        body: JSON.stringify({name:'hello.txt', size:5, chunkSize:256})
       });
       const sess = await s.json();
       const sid = sess.id;
@@ -58,7 +76,9 @@ export default function App() {
       });
       const c = await confirm.json();
       setStatus('Sent chunk — session '+sid+' received '+(c.received||'?')+' bytes');
-    } catch (e) { setStatus('Send error: '+e.message); }
+    } catch (e) {
+      setStatus('Send error: '+e.message);
+    }
   }
 
   return (

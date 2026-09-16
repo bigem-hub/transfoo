@@ -1,0 +1,32 @@
+<Window
+    x:Class="Transfo.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Transfo.App"
+    Title="Transfo by Orvyn"
+    ExtendsContentIntoTitleBar="True"
+    Closed="Window_Closed">
+    <Grid>
+        <NavigationView
+            x:Name="Nav"
+            PaneDisplayMode="Top"
+            IsBackButtonVisible="Collapsed"
+            SelectionChanged="Nav_SelectionChanged"
+            ItemInvoked="Nav_ItemInvoked">
+
+            <NavigationView.MenuItems>
+                <NavigationViewItem Icon="Home" Tag="home" Content="Home" />
+                <NavigationViewItem Icon="Mail" Tag="transfer" Content="Transfer" />
+                <NavigationViewItem Icon="Bluetooth" Tag="pairing" Content="Pair" />
+                <NavigationViewItem Icon="Devices" Tag="devices" Content="Devices" />
+                <NavigationViewItem Icon="Setting" Tag="settings" Content="Settings" />
+            </NavigationView.MenuItems>
+
+            <NavigationView.PaneFooter>
+                <NavigationViewItem Icon="Help" Tag="about" Content="About" />
+            </NavigationView.PaneFooter>
+
+            <Frame x:Name="ContentFrame" Padding="24" />
+        </NavigationView>
+    </Grid>
+</Window>

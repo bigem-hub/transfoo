@@ -1,0 +1,4 @@
+capture listening on :4005
+=== REQUEST (219 bytes) ===
+b'POST /api/auth/register HTTP/1.1\r\nHost: localhost:4005\r\nUser-Agent: TransfoCore/1.0\r\nContent-Type: application/json\r\n\x00Content-Length: 60\r\nConnection: close\r\n\r\n{"email":"probe-fresh@transfo.local","password":"Test1234!"}'
+=== sent canned response ===

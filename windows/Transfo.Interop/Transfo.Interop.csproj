@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>Transfo.Interop</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- smoke/ is a standalone console harness; keep it out of the library compile -->
+    <Compile Remove="smoke\**" />
+    <None Remove="smoke\**" />
+    <Content Remove="smoke\**" />
+    <!-- TransfoCore.dll is copied beside the consuming app by build.ps1 after publish;
+         P/Invoke resolves it from the executable directory at runtime. -->
+    <None Include="..\Transfo.Core\bin\TransfoCore.dll" Link="TransfoCore.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

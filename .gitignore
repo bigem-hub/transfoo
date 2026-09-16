@@ -15,4 +15,29 @@ Thumbs.db
 android/.gradle/
 android/build/
 android/app/build/
-android/local.properties
+android/local.properties# Native build outputs
+bin/
+obj/
+publish/
+dist/
+*.appx
+*.msix
+installer/*.exe
+transfo.exe
+libTransfoCore.dll.a
+.tar.gz
+# Electron remnants (removed)
+node_modules/
+package-lock.json
+package.json
+.next/
+out/
+dist/
+app/
+pages/
+styles/
+public/ (assets moved)
+verify-*.png
+verify-*.log
+verify.js
+

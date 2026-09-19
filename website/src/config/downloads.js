@@ -9,14 +9,14 @@ export const downloads = {
     label: "Windows 10 / 11",
     filename: "Transfo-Setup.exe",
     url: "/downloads/Transfo-Setup.exe",
-    size: "67 MB",
+    size: "162 MB",
   },
   android: {
     version: "1.1.0",
     label: "Android 8.0+",
     filename: "Transfo.apk",
     url: "/downloads/Transfo.apk",
-    size: "10 MB",
+    size: "17 MB",
   },
 }
 

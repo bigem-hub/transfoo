@@ -9,6 +9,7 @@ namespace Transfo.Desktop;
 public partial class MainWindow : Window
 {
     private Bridge? _bridge;
+    private LocalHttpServer? _server;
 
     public MainWindow()
     {
@@ -34,16 +35,20 @@ public partial class MainWindow : Window
             var env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(AppDataPath(), "WebView2"), null);
             await Web.EnsureCoreWebView2Async(env);
 
+            string dist = Path.Combine(AppContext.BaseDirectory, "dist");
+            if (!Directory.Exists(dist))
+            {
+                string probe = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, @"..\..\..\..\..\website\dist"));
+                if (Directory.Exists(probe)) dist = probe;
+            }
+
+            _server = new LocalHttpServer(dist);
+
             _bridge = new Bridge(Web.CoreWebView2, Web.Dispatcher);
             Web.CoreWebView2.WebMessageReceived += Bridge_WebMessageReceived;
             Web.CoreWebView2.NavigationCompleted += Bridge_NavigationCompleted;
 
-            var args = Environment.GetCommandLineArgs();
-            string target = args.Contains("--nav-test")
-                ? "http://127.0.0.1:4000/api/pairing"
-                : "http://127.0.0.1:4000/app.html";
-
-            Web.CoreWebView2.Navigate(target);
+            Web.CoreWebView2.Navigate($"http://127.0.0.1:{_server.Port}/app.html");
         }
         catch (Exception ex)
         {
@@ -70,7 +75,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            await Task.Delay(8000);
+            await Task.Delay(15000);
             string json = await Web.CoreWebView2.ExecuteScriptAsync(
                 "JSON.stringify({title: document.title, preview: !(window.chrome && window.chrome.webview), " +
                 "text: document.body ? document.body.innerText.slice(0, 4000) : ''})");
@@ -95,6 +100,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _server?.Dispose();
         _bridge?.Dispose();
         base.OnClosed(e);
     }

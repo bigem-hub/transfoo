@@ -110,8 +110,26 @@ function mockInvoke(cmd, args = {}) {
         case 'discovery.stop':
           return resolve({ ok: true, data: true })
         case 'http': {
-          if (args.url.endsWith('/api/transfer/sessions')) return resolve({ ok: true, data: { status: 200, body: '[]' } })
-          return resolve({ ok: true, data: { status: 200, body: '{}' } })
+          try {
+            const headers = {}
+            if (args.json) headers['Content-Type'] = 'application/json'
+            if (args.token) headers['Authorization'] = `Bearer ${args.token}`
+            fetch(args.url, {
+              method: args.method || 'GET',
+              headers,
+              body: args.json || undefined,
+            })
+              .then(async (res) => {
+                const text = await res.text()
+                resolve({ ok: true, data: { status: res.status, body: text } })
+              })
+              .catch((err) => {
+                resolve({ ok: false, error: err.message, data: { status: 0, body: null } })
+              })
+          } catch (err) {
+            resolve({ ok: false, error: err.message, data: { status: 0, body: null } })
+          }
+          return
         }
         case 'dialog.openFiles':
           return resolve({ ok: true, data: { paths: [] } })

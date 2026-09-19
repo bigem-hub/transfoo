@@ -294,6 +294,16 @@ fun ModernTransfoApp() {
                                 addLog("Pairing failed: ${e.message}")
                             }
                         }
+                    },
+                    isCloudMode = targetIp.startsWith("https://", ignoreCase = true) || targetIp.contains("vercel.app"),
+                    onModeChange = { isCloud ->
+                        if (isCloud) {
+                            targetIp = "https://transfoo.vercel.app"
+                            targetPort = 443
+                        } else {
+                            targetIp = "192.168.1.100"
+                            targetPort = 4000
+                        }
                     }
                 )
 
@@ -592,7 +602,9 @@ fun PairScreen(
     onPinChange: (String) -> Unit,
     statusText: String,
     hasToken: Boolean,
-    onStartHandshake: () -> Unit
+    onStartHandshake: () -> Unit,
+    isCloudMode: Boolean = false,
+    onModeChange: ((Boolean) -> Unit)? = null
 ) {
     Column(
         modifier = Modifier
@@ -615,12 +627,41 @@ fun PairScreen(
                     color = Color.White
                 )
 
+                // Mode selector: Cloud vs LAN
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = !isCloudMode,
+                        onClick = { onModeChange?.invoke(false) },
+                        label = { Text("LAN PC", fontSize = 12.sp) },
+                        leadingIcon = { Icon(Icons.Default.Lan, contentDescription = null, tint = if (!isCloudMode) Color.Black else TextMuted) },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    FilterChip(
+                        selected = isCloudMode,
+                        onClick = { onModeChange?.invoke(true) },
+                        label = { Text("Cloud Server", fontSize = 12.sp) },
+                        leadingIcon = { Icon(Icons.Default.Cloud, contentDescription = null, tint = if (isCloudMode) Color.Black else TextMuted) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
                 OutlinedTextField(
                     value = targetIp,
                     onValueChange = onIpChange,
-                    label = { Text("PC IP Address") },
+                    label = { Text("Server URL or PC IP") },
+                    placeholder = { Text(if (isCloudMode) "https://transfoo.vercel.app" else "e.g. 192.168.1.x") },
                     singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Lan, contentDescription = null, tint = AmberPrimary) },
+                    leadingIcon = {
+                        Icon(
+                            if (isCloudMode) Icons.Default.Cloud else Icons.Default.Lan,
+                            contentDescription = null,
+                            tint = AmberPrimary
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AmberPrimary,
@@ -628,18 +669,20 @@ fun PairScreen(
                     )
                 )
 
-                OutlinedTextField(
-                    value = targetPort.toString(),
-                    onValueChange = { onPortChange(it.toIntOrNull() ?: 4000) },
-                    label = { Text("Port (Default: 4000)") },
-                    singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Numbers, contentDescription = null, tint = AmberPrimary) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = AmberPrimary,
-                        unfocusedBorderColor = SurfaceBorder
+                if (!isCloudMode) {
+                    OutlinedTextField(
+                        value = targetPort.toString(),
+                        onValueChange = { onPortChange(it.toIntOrNull() ?: 4000) },
+                        label = { Text("Port (Default: 4000)") },
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.Numbers, contentDescription = null, tint = AmberPrimary) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AmberPrimary,
+                            unfocusedBorderColor = SurfaceBorder
+                        )
                     )
-                )
+                }
 
                 if (pinCode.isNotEmpty()) {
                     Card(

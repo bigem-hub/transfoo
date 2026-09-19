@@ -1,0 +1,119 @@
+﻿using System.IO;
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Interop;
+using Microsoft.Web.WebView2.Core;
+
+namespace Transfo.Desktop;
+
+public partial class MainWindow : Window
+{
+    private Bridge? _bridge;
+
+    public MainWindow()
+    {
+        InitializeComponent();
+        SourceInitialized += OnSourceInitialized;
+        Loaded += async (_, _) => await InitWebViewAsync();
+    }
+
+    private void OnSourceInitialized(object? sender, EventArgs e)
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        var dpi = DwmGetWindowAttribute(hwnd, DwmWindowAttribute.DwmwaUseImmersiveDarkMode, out int value, Marshal.SizeOf<int>());
+        if (dpi != 0) value = 1;
+        value = 1;
+        DwmSetWindowAttribute(hwnd, DwmWindowAttribute.DwmwaUseImmersiveDarkMode, ref value, Marshal.SizeOf<int>());
+    }
+
+    private async Task InitWebViewAsync()
+    {
+        try
+        {
+            var env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(AppDataPath(), "WebView2"), null);
+            await Web.EnsureCoreWebView2Async(env);
+
+            _bridge = new Bridge(Web.CoreWebView2, Web.Dispatcher);
+            Web.CoreWebView2.WebMessageReceived += Bridge_WebMessageReceived;
+            Web.CoreWebView2.NavigationCompleted += Bridge_NavigationCompleted;
+
+            var args = Environment.GetCommandLineArgs();
+            string target = args.Contains("--nav-test")
+                ? "http://127.0.0.1:4000/api/pairing"
+                : "http://127.0.0.1:4000/app.html";
+
+            Web.CoreWebView2.Navigate(target);
+        }
+        catch (Exception ex)
+        {
+            Log("INIT FAILED " + ex);
+        }
+    }
+
+    private void Log(string line)
+    {
+        if (!Environment.GetCommandLineArgs().Contains("--selftest")) return;
+        try { File.AppendAllText(Path.Combine(Path.GetTempPath(), $"transfo-bridge-{Environment.ProcessId}.log"), line + Environment.NewLine); } catch { }
+    }
+
+    private void Bridge_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+    {
+        if (e.IsSuccess)
+        {
+            _bridge?.OnNavigated();
+            if (Environment.GetCommandLineArgs().Contains("--selftest")) _ = RunSelfTestAsync();
+        }
+    }
+
+    private async Task RunSelfTestAsync()
+    {
+        try
+        {
+            await Task.Delay(8000);
+            string json = await Web.CoreWebView2.ExecuteScriptAsync(
+                "JSON.stringify({title: document.title, preview: !(window.chrome && window.chrome.webview), " +
+                "text: document.body ? document.body.innerText.slice(0, 4000) : ''})");
+            var dir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var png = Path.Combine(dir, "transfo-selftest.png");
+            using var fs = File.Create(png);
+            await Web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, fs);
+            File.WriteAllText(Path.Combine(dir, "transfo-selftest.json"), json);
+            Console.WriteLine("SELFTEST " + json);
+            System.Windows.Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("SELFTEST FAILED " + ex);
+        }
+    }
+
+    private void Bridge_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        _bridge?.HandleMessage(e.TryGetWebMessageAsString());
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _bridge?.Dispose();
+        base.OnClosed(e);
+    }
+
+    private static string AppDataPath()
+    {
+        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Transfo");
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, DwmWindowAttribute attribute, ref int value, int size);
+
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmGetWindowAttribute(IntPtr hwnd, DwmWindowAttribute attribute, out int value, int size);
+
+    private enum DwmWindowAttribute
+    {
+        DwmwaUseImmersiveDarkMode = 20,
+    }
+}

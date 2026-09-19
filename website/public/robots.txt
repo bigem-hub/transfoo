@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://transfoo.vercel.app/sitemap.xml

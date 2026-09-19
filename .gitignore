@@ -31,8 +31,6 @@ libTransfoCore.dll.a
 
 # Electron remnants (removed)
 node_modules/
-package-lock.json
-package.json
 .next/
 out/
 dist/

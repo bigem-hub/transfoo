@@ -105,8 +105,8 @@ fun ModernTransfoApp() {
     var selectedTab by remember { mutableStateOf(NavTab.DISCOVER) }
 
     // State Variables
-    var targetIp by remember { mutableStateOf("192.168.1.100") }
-    var targetPort by remember { mutableIntStateOf(4000) }
+    var targetIp by remember { mutableStateOf("https://transfoo.vercel.app") }
+    var targetPort by remember { mutableIntStateOf(443) }
     var authToken by remember { mutableStateOf("") }
     var statusText by remember { mutableStateOf("Ready to connect") }
     var logs by remember { mutableStateOf(listOf("Transfo Native v1.1.0 initialized.")) }
@@ -120,6 +120,9 @@ fun ModernTransfoApp() {
     var transferProgress by remember { mutableFloatStateOf(0f) }
     var transferSpeed by remember { mutableStateOf("0 KB/s") }
     var isTransferring by remember { mutableStateOf(false) }
+
+    // Cloud mode - default to true for online/production use
+    var isCloudMode by remember { mutableStateOf(true) }
 
     // Handshake PIN state
     var pairPinCode by remember { mutableStateOf("") }
@@ -295,16 +298,8 @@ fun ModernTransfoApp() {
                             }
                         }
                     },
-                    isCloudMode = targetIp.startsWith("https://", ignoreCase = true) || targetIp.contains("vercel.app"),
-                    onModeChange = { isCloud ->
-                        if (isCloud) {
-                            targetIp = "https://transfoo.vercel.app"
-                            targetPort = 443
-                        } else {
-                            targetIp = "192.168.1.100"
-                            targetPort = 4000
-                        }
-                    }
+                    isCloudMode = isCloudMode,
+                    onModeChange = { isCloudMode = it }
                 )
 
                 NavTab.TRANSFER -> TransferScreen(

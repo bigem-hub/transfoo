@@ -1,17 +1,18 @@
 buildscript {
-  ext {
-    buildToolsVersion = "35.0.0"
-    minSdkVersion = 24
-    compileSdkVersion = 35
-    targetSdkVersion = 35
-    kotlinVersion = "1.9.24"
-  }
-  repositories { google(); mavenCentral(); }
-  dependencies {
-    // AGP & Kotlin versions from the RN plugin's catalog: agp=8.5.0, kotlin=1.9.24.
-    classpath("com.android.tools.build:gradle:8.5.0")
-    classpath("com.facebook.react:react-native-gradle-plugin:0.75.4")
-    classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")
-  }
+    ext {
+        buildToolsVersion = "35.0.0"
+        minSdkVersion = 24
+        compileSdkVersion = 35
+        targetSdkVersion = 35
+        kotlinVersion = "1.9.24"
+        agpVersion = "8.5.0"
+    }
+    repositories { google(); mavenCentral(); }
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.5.0")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")
+    }
 }
-apply plugin: "com.facebook.react.rootproject"
+allprojects {
+    repositories { google(); mavenCentral(); }
+}

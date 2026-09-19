@@ -1,14 +1,5 @@
 pluginManagement {
-  includeBuild("${rootDir}/node_modules/@react-native/gradle-plugin")
-}
-plugins { id("com.facebook.react.settings") }
-extensions.configure(com.facebook.react.ReactSettingsExtension) {
-  // Supply autolink config from a file instead of invoking `cmd /c npx ...`
-  // (this shell cannot run `cmd /c`, so command-based autolinking always fails).
-  it.autolinkLibrariesFromConfigFile(file("autolink.json"))
+    repositories { google(); mavenCentral(); gradlePluginPortal(); }
 }
 rootProject.name = 'Transfo'
 include ':app'
-// Top-level includeBuild provides the `com.facebook.react:react-native-gradle-plugin`
-// buildscript classpath via composite substitution (it is NOT published to Maven).
-includeBuild("${rootDir}/node_modules/@react-native/gradle-plugin")

@@ -70,15 +70,17 @@ public partial class MainWindow : Window
         try
         {
             await Task.Delay(15000);
-            // Round-trip probe: page -> host -> page. Must resolve, not time out.
+            // Round-trip probe: page -> host -> page for every button-grade
+            // command. Each entry must resolve, not time out.
             await Web.CoreWebView2.ExecuteScriptAsync(
-                "(function(){ window.__rt = 'pending'; var id = 987001;" +
+                "(function(){ window.__rt = {}; var seq = 987000;" +
+                " var cmds = ['ping', 'config.get', 'discovery.start', 'discovery.snapshot', 'discovery.stop'];" +
                 " function h(e){ var m = (typeof e.data === 'string') ? JSON.parse(e.data) : e.data;" +
-                " if (m && (m.type === 'result' || m.type === 'error') && m.id === id)" +
-                " { window.__rt = m.type + ':' + JSON.stringify(m.data || m.error); window.chrome.webview.removeEventListener('message', h); } }" +
+                " if (m && (m.type === 'result' || m.type === 'error') && m.id >= 987000 && m.id < 987100)" +
+                " { window.__rt[m.id] = m.type + ':' + JSON.stringify(m.data !== undefined ? m.data : m.error).slice(0, 120); } }" +
                 " window.chrome.webview.addEventListener('message', h);" +
-                " window.chrome.webview.postMessage({ id: id, cmd: 'ping', args: {} }); })()");
-            await Task.Delay(3000);
+                " cmds.forEach(function(c, i){ window.chrome.webview.postMessage({ id: 987000 + i, cmd: c, args: {} }); }); })()");
+            await Task.Delay(4000);
             string rt = await Web.CoreWebView2.ExecuteScriptAsync("JSON.stringify(window.__rt || 'no-channel')");
             Log("ROUNDTRIP " + rt);
             string json = await Web.CoreWebView2.ExecuteScriptAsync(

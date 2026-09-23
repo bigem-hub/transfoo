@@ -87,28 +87,27 @@ function mkErr(msg) {
 }
 
 function mockInvoke(cmd, args = {}) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     setTimeout(() => {
       switch (cmd) {
         case 'ping':
-          return resolve({ ok: true, data: { name: 'Transfo', version: '1.1.0', desktop: false } })
+          return resolve({ name: 'Transfo', version: '1.1.0', desktop: false })
         case 'config.get':
-          return resolve({
-            ok: true,
-            data: { deviceName: 'DESKTOP', serverUrl: 'http://192.168.1.104', port: 4000, downloadDir: '', discovery: true },
-          })
+          return resolve(
+            { deviceName: 'DESKTOP', serverUrl: 'http://192.168.1.104', port: 4000, downloadDir: '', discovery: true },
+          )
         case 'config.set':
-          return resolve({ ok: true, data: true })
+          return resolve({ ...args })
         case 'runtime.init':
-          return resolve({ ok: true })
+          return resolve(null)
         case 'runtime.shutdown':
-          return resolve({ ok: true })
+          return resolve(null)
         case 'discovery.snapshot':
-          return resolve({ ok: true, data: mock.devices })
+          return resolve(mock.devices)
         case 'discovery.start':
-          return resolve({ ok: true, data: true })
+          return resolve(null)
         case 'discovery.stop':
-          return resolve({ ok: true, data: true })
+          return resolve(null)
         case 'http': {
           try {
             const headers = {}
@@ -121,20 +120,20 @@ function mockInvoke(cmd, args = {}) {
             })
               .then(async (res) => {
                 const text = await res.text()
-                resolve({ ok: true, data: { status: res.status, body: text } })
+                resolve({ status: res.status, body: text })
               })
               .catch((err) => {
-                resolve({ ok: false, error: err.message, data: { status: 0, body: null } })
+                reject(new Error(err.message || `fetch failed: ${cmd}`))
               })
           } catch (err) {
-            resolve({ ok: false, error: err.message, data: { status: 0, body: null } })
+            reject(err instanceof Error ? err : new Error(String(err)))
           }
           return
         }
         case 'dialog.openFiles':
-          return resolve({ ok: true, data: { paths: [] } })
+          return resolve({ paths: [] })
         case 'dialog.openFolder':
-          return resolve({ ok: true, data: { path: '' } })
+          return resolve({ path: '' })
         default:
           return mkErr(`host not available in preview mode: ${cmd}`)
       }

@@ -123,9 +123,9 @@ export function StoreProvider({ children }) {
           .then(([ping, cfg]) => {
             dispatch({
               type: 'set',
-              payload: { ready: true, host: ping?.data || null },
+              payload: { ready: true, host: ping || null },
             })
-            action.setConfig(cfg?.data || {})
+            action.setConfig(cfg || {})
           })
           .catch(() => dispatch({ type: 'set', payload: { ready: true } }))
       },

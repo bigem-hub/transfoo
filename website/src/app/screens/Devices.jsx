@@ -14,8 +14,8 @@ export default function Devices() {
 
   useEffect(() => {
     if (state.config.discovery && state.ready && !state.discovering) {
-      bridge.invoke('discovery.start').then((res) => {
-        if (res?.ok) action.dispatch({ type: 'set', payload: { discovering: true } })
+      bridge.invoke('discovery.start').then(() => {
+        action.dispatch({ type: 'set', payload: { discovering: true } })
       }).catch(() => {})
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -23,16 +23,20 @@ export default function Devices() {
 
   async function toggleDiscovery() {
     if (state.discovering) {
-      await bridge.invoke('discovery.stop')
+      try {
+        await bridge.invoke('discovery.stop')
+      } catch {
+        /* host already stopped */
+      }
       action.dispatch({ type: 'set', payload: { discovering: false } })
     } else {
-      const res = await bridge.invoke('discovery.start')
-      if (res?.ok) {
+      try {
+        await bridge.invoke('discovery.start')
         action.dispatch({ type: 'set', payload: { discovering: true } })
         const snap = await bridge.invoke('discovery.snapshot')
-        if (snap?.ok && Array.isArray(snap.data)) action.setDevices(snap.data)
-      } else {
-        setMsg(res?.error || 'could not start discovery')
+        if (Array.isArray(snap)) action.setDevices(snap)
+      } catch (e) {
+        setMsg(e.message || 'could not start discovery')
       }
     }
   }

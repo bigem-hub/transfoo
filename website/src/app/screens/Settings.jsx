@@ -25,7 +25,7 @@ export default function Settings() {
     action.setConfig(patch)
     bridge
       .invoke('config.set', patch)
-      .then((res) => setSaved(res?.ok !== false ? 'Saved.' : 'Could not persist.'))
+      .then(() => setSaved('Saved.'))
       .catch(() => setSaved('Could not reach host in preview mode.'))
   }
 

@@ -40,20 +40,28 @@ export default function Receive() {
   }, [state.ready, state.token])
 
   async function chooseFolder() {
-    const res = await bridge.invoke('dialog.openFolder')
-    if (res?.ok && res.data?.path) {
-      setDest(res.data.path)
-      action.setConfig({ downloadDir: res.data.path })
-      bridge.invoke('config.set', { downloadDir: res.data.path }).catch(() => {})
+    try {
+      const res = await bridge.invoke('dialog.openFolder')
+      if (res?.path) {
+        setDest(res.path)
+        action.setConfig({ downloadDir: res.path })
+        bridge.invoke('config.set', { downloadDir: res.path }).catch(() => {})
+      }
+    } catch (e) {
+      setError(e.message || String(e))
     }
   }
 
   async function receive(s) {
     let target = dest
     if (!target) {
-      const res = await bridge.invoke('dialog.openFolder')
-      if (!res?.ok || !res.data?.path) return
-      target = res.data.path
+      try {
+        const res = await bridge.invoke('dialog.openFolder')
+        if (!res?.path) return
+        target = res.path
+      } catch {
+        return
+      }
       setDest(target)
       action.setConfig({ downloadDir: target })
       bridge.invoke('config.set', { downloadDir: target }).catch(() => {})
@@ -66,10 +74,8 @@ export default function Receive() {
         name: s.name,
         destPath: target,
       })
-      if (!res?.ok) throw new Error(res?.error)
-      if (res?.data?.handle) {
-        action.upsertTransfer({ handle: res.data.handle, dir: 'receive', phase: 'started', fileName: s.name, total: s.size })
-      }
+      if (!res?.handle) throw new Error(`failed to start download of ${s.name}`)
+      action.upsertTransfer({ handle: res.handle, dir: 'receive', phase: 'started', fileName: s.name, total: s.size })
       await refresh()
     } catch (e) {
       setError(e.message || String(e))

@@ -13,9 +13,13 @@ export default function Send() {
 
   async function pickFiles() {
     setError('')
-    const res = await bridge.invoke('dialog.openFiles')
-    if (res?.ok && res.data?.paths?.length) {
-      setFiles(res.data.paths)
+    try {
+      const res = await bridge.invoke('dialog.openFiles')
+      if (res?.paths?.length) {
+        setFiles(res.paths)
+      }
+    } catch (e) {
+      setError(e.message || String(e))
     }
   }
 
@@ -31,10 +35,8 @@ export default function Send() {
           filePath: f.path,
           resume: true,
         })
-        if (!res?.ok) throw new Error(res?.error || `failed to start ${f.name}`)
-        if (res?.data?.handle) {
-          action.upsertTransfer({ handle: res.data.handle, dir: 'send', phase: 'started', fileName: f.name })
-        }
+        if (!res?.handle) throw new Error(`failed to start ${f.name}`)
+        action.upsertTransfer({ handle: res.handle, dir: 'send', phase: 'started', fileName: f.name })
       }
       setFiles([])
     } catch (e) {

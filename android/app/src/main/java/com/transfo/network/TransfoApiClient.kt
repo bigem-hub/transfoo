@@ -33,12 +33,36 @@ class TransfoApiClient {
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     private fun buildUrl(hostOrIp: String, port: Int, path: String): String {
-        val cleanHost = hostOrIp.trim().removePrefix("http://").removePrefix("https://")
-        return if (cleanHost.contains(":")) {
-            "http://$cleanHost$path"
-        } else {
-            "http://$cleanHost:$port$path"
+        val raw = hostOrIp.trim()
+        val isExplicitHttps = raw.startsWith("https://", ignoreCase = true)
+        val isExplicitHttp = raw.startsWith("http://", ignoreCase = true)
+        val cleaned = raw
+            .removePrefix("http://")
+            .removePrefix("https://")
+            .removePrefix("HTTP://")
+            .removePrefix("HTTPS://")
+            .trimEnd('/')
+
+        val normalizedPath = if (path.startsWith("/")) path else "/$path"
+
+        // Explicit host:port -> keep it, preserving an explicit https scheme.
+        if (cleaned.contains(":")) {
+            val scheme = if (isExplicitHttps) "https" else "http"
+            return "$scheme://$cleaned$normalizedPath"
         }
+        // Explicit https without port -> default 443, no port suffix.
+        if (isExplicitHttps) return "https://$cleaned$normalizedPath"
+        // Explicit http without port -> append caller's port unless standard.
+        if (isExplicitHttp) {
+            return if (port != 80 && port != 443) "http://$cleaned:$port$normalizedPath"
+            else "http://$cleaned$normalizedPath"
+        }
+        // Bare domain (e.g. transfoo.vercel.app) -> HTTPS cloud.
+        if (cleaned.contains(".") && !cleaned.matches(Regex("""^\d+\.\d+\.\d+\.\d+$"""))) {
+            return "https://$cleaned$normalizedPath"
+        }
+        // Bare LAN IP -> http + port.
+        return "http://$cleaned:$port$normalizedPath"
     }
 
     suspend fun login(ip: String, port: Int = 4000, email: String = "pc", password: String = "transfo"): Result<String> = withContext(Dispatchers.IO) {

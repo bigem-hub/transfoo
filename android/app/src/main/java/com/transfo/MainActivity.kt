@@ -254,6 +254,7 @@ fun ModernTransfoApp() {
                     onSelectPeer = { peer ->
                         targetIp = peer.ip
                         targetPort = peer.port
+                        isCloudMode = false
                         selectedTab = NavTab.PAIR
                         addLog("Targeting peer ${peer.name} (${peer.ip})")
                     },
@@ -299,7 +300,16 @@ fun ModernTransfoApp() {
                         }
                     },
                     isCloudMode = isCloudMode,
-                    onModeChange = { isCloudMode = it }
+                    onModeChange = { cloud ->
+                        isCloudMode = cloud
+                        if (cloud) {
+                            targetIp = "https://transfoo.vercel.app"
+                            targetPort = 443
+                        } else {
+                            targetIp = "192.168.1.100"
+                            targetPort = 4000
+                        }
+                    }
                 )
 
                 NavTab.TRANSFER -> TransferScreen(

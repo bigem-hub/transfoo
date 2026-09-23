@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
+import crypto from 'node:crypto';
 
 dotenv.config();
 
@@ -74,7 +75,7 @@ app.post('/api/pairing/authorize', (req, res) => {
         return res.status(400).json({ error: 'Code expired' });
     }
     pairCache.delete(code);
-    const pairedToken = 'paired-' + require('crypto').randomBytes(16).toString('hex');
+    const pairedToken = 'paired-' + crypto.randomBytes(16).toString('hex');
     res.json({ paired: true, deviceName: entry.name, token: pairedToken, pairedAt: new Date().toISOString() });
 });
 
@@ -84,12 +85,12 @@ app.delete('/api/pairing/:code', (req, res) => {
 });
 
 // --- Transfer Routes ---
-const sessions = new Map();
+// (sessions/pairCache/users declared once at top)
 
 app.post('/api/transfer/sessions', (req, res) => {
     const { name, size, chunkSize } = req.body;
     const id = crypto.randomUUID();
-    sessions.set(id, { id, name: name || 'file', size: size || 0, chunkSize: chunkSize || 262144, received: 0, done: false });
+    sessions.set(id, { id, name: name || 'file', size: size || 0, chunkSize: chunkSize || 262144, received: 0, done: false, chunks: [] });
     const totalChunks = size > 0 ? Math.ceil(size / (chunkSize || 262144)) : 0;
     res.status(201).json({ id, chunkSize: chunkSize || 262144, totalChunks, name: name || 'file', size: size || 0 });
 });
@@ -110,24 +111,27 @@ app.delete('/api/transfer/sessions/:id', (req, res) => {
     res.json({ removed: true });
 });
 
-app.post('/api/transfer/sessions/:id/chunk', express.raw({ type: 'application/json', limit: '10mb' }), (req, res) => {
-    // Handle base64 chunk upload
+app.post('/api/transfer/sessions/:id/chunk', (req, res) => {
+    // Base64 chunk upload (parsed by express.json above)
     const { id } = req.params;
-    const { index, data, offset } = JSON.parse(req.body.toString());
-    // In production, write chunk to file
-    res.json({ ok: true, received: req.body.length });
+    const sess = sessions.get(id);
+    if (!sess) return res.status(404).json({ error: 'session not found' });
+    const { index, data, offset } = req.body || {};
+    const buf = Buffer.from(data || '', 'base64');
+    sess.chunks.push({ index: index ?? 0, offset: offset ?? sess.received, data: buf });
+    sess.received += buf.length;
+    if (sess.size > 0 && sess.received >= sess.size) sess.done = true;
+    res.json({ id: sess.id, received: sess.received, size: sess.size, done: sess.done });
 });
 
 app.get('/api/transfer/sessions/:id/pull', (req, res) => {
-    // Stream assembled file back
+    const sess = sessions.get(req.params.id);
+    if (!sess) return res.status(404).json({ error: 'session not found' });
+    const ordered = [...sess.chunks].sort((a, b) => a.index - b.index).map((c) => c.data);
+    const body = Buffer.concat(ordered);
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', 'attachment; filename="file"');
-    res.send('file content placeholder');
-});
-
-app.delete('/api/transfer/sessions/:id', (req, res) => {
-    sessions.delete(req.params.id);
-    res.json({ removed: true });
+    res.setHeader('Content-Disposition', `attachment; filename="${sess.name}"`);
+    res.send(body);
 });
 
 // --- Devices ---

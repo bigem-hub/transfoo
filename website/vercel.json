@@ -2,7 +2,26 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "redirects": [
+    {
+      "source": "/downloads/Transfo-Setup.exe",
+      "destination": "https://github.com/bigem-hub/transfoo/releases/download/v1.1.0/Transfo-Setup.exe",
+      "permanent": false
+    },
+    {
+      "source": "/downloads/Transfo-v1.1.0-Setup.exe",
+      "destination": "https://github.com/bigem-hub/transfoo/releases/download/v1.1.0/Transfo-v1.1.0-Setup.exe",
+      "permanent": false
+    },
+    {
+      "source": "/downloads/Transfo.apk",
+      "destination": "https://github.com/bigem-hub/transfoo/releases/download/v1.1.0/Transfo.apk",
+      "permanent": false
+    }
+  ],
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.js" },
+    { "source": "/app", "destination": "/app.html" },
     { "source": "/app/(.*)", "destination": "/app.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]

@@ -1,4 +1,6 @@
 using System.IO;
+using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
@@ -13,6 +15,7 @@ namespace Transfo.Desktop;
 /// </summary>
 public sealed class Bridge : IDisposable
 {
+    private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromMinutes(10) };
     private readonly CoreWebView2 _core;
     private readonly Dispatcher _dispatcher;
     private readonly Transfo.Interop.TransfoRuntime _runtime;
@@ -96,8 +99,7 @@ public sealed class Bridge : IDisposable
                         string url = GetString(args, "url") ?? "";
                         string? token = GetString(args, "token");
                         string? json = GetString(args, "json");
-                        int rc = _runtime.Http(method, url, string.IsNullOrEmpty(token) ? null : token, string.IsNullOrEmpty(json) ? null : json, out string? body, out int status);
-                        data = new { status = rc == 0 ? status : 0, body };
+                        data = SendHttp(method, url, token, json);
                     }
                     break;
                 case "transfer.upload":
@@ -106,10 +108,20 @@ public sealed class Bridge : IDisposable
                         string token = GetString(args, "token") ?? "";
                         string path = GetString(args, "filePath") ?? "";
                         bool resume = GetBool(args, "resume", true);
-                        ulong handle = _runtime.StartUpload(url, token, path, resume);
-                        if (handle == 0) throw new InvalidOperationException(_runtime.LastError ?? "failed to start upload");
-                        _dir[handle] = "send";
-                        data = new { handle };
+                        if (IsHttps(url))
+                        {
+                            ulong h = (ulong)DateTime.UtcNow.Ticks;
+                            _dir[h] = "send";
+                            StartHttpUpload(h, url, token, path);
+                            data = new { handle = h };
+                        }
+                        else
+                        {
+                            ulong handle = _runtime.StartUpload(url, token, path, resume);
+                            if (handle == 0) throw new InvalidOperationException(_runtime.LastError ?? "failed to start upload");
+                            _dir[handle] = "send";
+                            data = new { handle };
+                        }
                     }
                     break;
                 case "transfer.download":
@@ -119,10 +131,20 @@ public sealed class Bridge : IDisposable
                         string sessionId = GetString(args, "sessionId") ?? "";
                         string name = GetString(args, "name") ?? "";
                         string dest = GetString(args, "destPath") ?? "";
-                        ulong handle = _runtime.StartDownload(url, token, sessionId, name, dest);
-                        if (handle == 0) throw new InvalidOperationException(_runtime.LastError ?? "failed to start download");
-                        _dir[handle] = "receive";
-                        data = new { handle };
+                        if (IsHttps(url))
+                        {
+                            ulong h = (ulong)DateTime.UtcNow.Ticks;
+                            _dir[h] = "receive";
+                            StartHttpDownload(h, url, token, sessionId, name, dest);
+                            data = new { handle = h };
+                        }
+                        else
+                        {
+                            ulong handle = _runtime.StartDownload(url, token, sessionId, name, dest);
+                            if (handle == 0) throw new InvalidOperationException(_runtime.LastError ?? "failed to start download");
+                            _dir[handle] = "receive";
+                            data = new { handle };
+                        }
                     }
                     break;
                 case "transfer.cancel":
@@ -225,6 +247,139 @@ public sealed class Bridge : IDisposable
     {
         if (_core == null || !Environment.GetCommandLineArgs().Contains("--selftest")) return;
         try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "transfo-bridge.log"), line + Environment.NewLine); } catch { }
+    }
+
+    /* ---- HTTP via managed client (HTTPS cloud + native fallback) ---- */
+
+    private static bool IsHttps(string url)
+        => url.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+
+    private object SendHttp(string method, string url, string? token, string? json)
+    {
+        // Native core has no TLS: route HTTPS through managed HttpClient.
+        if (!IsHttps(url))
+        {
+            int rc = _runtime.Http(method, url, string.IsNullOrEmpty(token) ? null : token, string.IsNullOrEmpty(json) ? null : json, out string? nativeBody, out int nativeStatus);
+            if (rc == 0 && nativeStatus > 0) return new { status = nativeStatus, body = nativeBody };
+        }
+        try
+        {
+            using var req = new HttpRequestMessage(new HttpMethod(method), url);
+            if (!string.IsNullOrEmpty(token))
+                req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            if (!string.IsNullOrEmpty(json) && (method == "POST" || method == "PUT" || method == "PATCH"))
+                req.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var resp = _http.Send(req);
+            int status = (int)resp.StatusCode;
+            string respBody = new StreamReader(resp.Content.ReadAsStream()).ReadToEnd();
+            return new { status, body = respBody };
+        }
+        catch (Exception ex)
+        {
+            return new { status = 0, body = (string?)null, error = ex.Message };
+        }
+    }
+
+    private void StartHttpUpload(ulong handle, string baseUrl, string token, string path)
+    {
+        Task.Run(async () =>
+        {
+            try
+            {
+                var fi = new FileInfo(path);
+                if (!fi.Exists) throw new FileNotFoundException("File not found: " + path);
+                long total = fi.Length;
+                string fileName = fi.Name;
+                const int chunkSize = 262144;
+                PostTransferEvent(handle, 0, "", fileName, 0, total, null, "send");
+
+                var createObj = new { name = fileName, size = total, chunkSize };
+                using var createReq = new HttpRequestMessage(HttpMethod.Post, baseUrl.TrimEnd('/') + "/api/transfer/sessions")
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(createObj), Encoding.UTF8, "application/json")
+                };
+                if (!string.IsNullOrEmpty(token)) createReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                using var createResp = await _http.SendAsync(createReq).ConfigureAwait(false);
+                createResp.EnsureSuccessStatusCode();
+                using var sessDoc = JsonDocument.Parse(await createResp.Content.ReadAsStringAsync().ConfigureAwait(false));
+                string sessionId = sessDoc.RootElement.GetProperty("id").GetString() ?? "";
+
+                await using var fs = File.OpenRead(path);
+                byte[] buf = new byte[chunkSize];
+                int index = 0;
+                long transferred = 0;
+                while (true)
+                {
+                    int read = await fs.ReadAsync(buf, 0, buf.Length).ConfigureAwait(false);
+                    if (read <= 0) break;
+                    var chunkObj = new { index, offset = transferred, data = Convert.ToBase64String(buf, 0, read) };
+                    using var chunkReq = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl.TrimEnd('/')}/api/transfer/sessions/{sessionId}/chunk")
+                    {
+                        Content = new StringContent(JsonSerializer.Serialize(chunkObj), Encoding.UTF8, "application/json")
+                    };
+                    if (!string.IsNullOrEmpty(token)) chunkReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                    using var chunkResp = await _http.SendAsync(chunkReq).ConfigureAwait(false);
+                    chunkResp.EnsureSuccessStatusCode();
+                    transferred += read;
+                    index++;
+                    PostTransferEvent(handle, transferred >= total ? 2 : 1, sessionId, fileName, transferred, total, null, "send");
+                }
+                if (total == 0) PostTransferEvent(handle, 2, sessionId, fileName, 0, 0, null, "send");
+            }
+            catch (Exception ex)
+            {
+                PostTransferEvent(handle, 4, "", Path.GetFileName(path), 0, 0, ex.Message, "send");
+            }
+        });
+    }
+
+    private void StartHttpDownload(ulong handle, string baseUrl, string token, string sessionId, string name, string dest)
+    {
+        Task.Run(async () =>
+        {
+            try
+            {
+                string outPath = Directory.Exists(dest) ? Path.Combine(dest, name) : dest;
+                PostTransferEvent(handle, 0, sessionId, name, 0, 0, null, "receive");
+                using var req = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl.TrimEnd('/')}/api/transfer/sessions/{sessionId}/pull");
+                if (!string.IsNullOrEmpty(token)) req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+                resp.EnsureSuccessStatusCode();
+                long total = resp.Content.Headers.ContentLength ?? 0;
+                await using var inStream = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outPath))!);
+                await using var outStream = File.Create(outPath);
+                byte[] buf = new byte[65536];
+                long transferred = 0;
+                int read;
+                while ((read = await inStream.ReadAsync(buf, 0, buf.Length).ConfigureAwait(false)) > 0)
+                {
+                    await outStream.WriteAsync(buf, 0, read).ConfigureAwait(false);
+                    transferred += read;
+                    PostTransferEvent(handle, 1, sessionId, name, transferred, total, null, "receive");
+                }
+                PostTransferEvent(handle, 2, sessionId, name, transferred, total, null, "receive");
+            }
+            catch (Exception ex)
+            {
+                PostTransferEvent(handle, 4, sessionId, name, 0, 0, ex.Message, "receive");
+            }
+        });
+    }
+
+    private void PostTransferEvent(ulong handle, int phase, string sessionId, string fileName, long transferred, long total, string? error, string dir)
+    {
+        _dispatcher.BeginInvoke(() => PostEvent("transfer:update", new
+        {
+            handle,
+            phase,
+            sessionId,
+            fileName,
+            transferred,
+            total,
+            error,
+            dir
+        }));
     }
 
     /* ---- native dialogs (UI thread) ---- */

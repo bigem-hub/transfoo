@@ -26,4 +26,8 @@ app.use('/api/pairing', pairingRoutes);
 app.use('/api/transfer', transferRoutes);
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Transfo server running on port ${PORT}`));
+const server = app.listen(PORT, () => console.log(`Transfo server running on port ${PORT}`));
+server.on('error', (err) => {
+  console.error(`Transfo server failed to listen on port ${PORT}: ${err.message}`);
+  process.exit(1);
+});

@@ -9,7 +9,7 @@ export const downloads = {
     label: "Windows 10 / 11",
     filename: "Transfo-Setup.exe",
     url: "https://github.com/bigem-hub/transfoo/releases/download/v1.1.0/Transfo-Setup.exe",
-    size: "47 MB",
+    size: "68 MB",
   },
   android: {
     version: "1.1.0",

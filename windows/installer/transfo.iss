@@ -28,6 +28,9 @@ DisableProgramGroupPage=yes
 Source: "..\Transfo.Desktop\bin\Release\net8.0-windows\win-x64\publish\Transfo.Desktop.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; Native transfer core (resolved from the executable directory at runtime)
 Source: "..\Transfo.Core\bin\TransfoCore.dll"; DestDir: "{app}"; Flags: ignoreversion
+; Bundled node runtime + Transfo server (auto-started by the app; staged by stage.ps1)
+Source: "stage\node\node.exe"; DestDir: "{app}\node"; Flags: ignoreversion
+Source: "stage\server\*"; DestDir: "{app}\server"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\Transfo"; Filename: "{app}\Transfo.Desktop.exe"

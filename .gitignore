@@ -38,3 +38,8 @@ verify.js
 # Website large binaries (hosted on GitHub Releases)
 website/public/downloads/*.exe
 website/public/downloads/*.apk
+
+# Installer staging + output (built locally by stage.ps1)
+windows/installer/stage/
+windows/installer/dist/
+

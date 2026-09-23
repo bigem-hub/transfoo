@@ -179,11 +179,15 @@ class TransfoApiClient {
         port: Int = 4000,
         token: String,
         sessionId: String,
+        index: Int,
+        offset: Long,
         base64Data: String
     ): Result<Boolean> = withContext(Dispatchers.IO) {
         runCatching {
             val url = buildUrl(ip, port, "/api/transfer/sessions/$sessionId/chunk")
             val bodyObj = JSONObject().apply {
+                put("index", index)
+                put("offset", offset)
                 put("data", base64Data)
             }
             val request = Request.Builder()

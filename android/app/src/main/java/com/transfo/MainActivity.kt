@@ -381,6 +381,7 @@ fun ModernTransfoApp() {
                                 val buffer = ByteArray(65536)
                                 var bytesRead: Int
                                 var totalUploaded = 0L
+                                var chunkIndex = 0
                                 val startTime = System.currentTimeMillis()
 
                                 withContext(Dispatchers.IO) {
@@ -388,9 +389,10 @@ fun ModernTransfoApp() {
                                         val chunkBytes = if (bytesRead == buffer.size) buffer else buffer.copyOf(bytesRead)
                                         val base64 = Base64.encodeToString(chunkBytes, Base64.NO_WRAP)
 
-                                        api.uploadChunk(targetIp, targetPort, authToken, sessionId, base64).getOrThrow()
+                                        api.uploadChunk(targetIp, targetPort, authToken, sessionId, chunkIndex, totalUploaded, base64).getOrThrow()
 
                                         totalUploaded += bytesRead
+                                        chunkIndex++
                                         transferProgress = (totalUploaded.toFloat() / selectedFileSize.toFloat()).coerceIn(0f, 1f)
 
                                         val elapsedSec = (System.currentTimeMillis() - startTime) / 1000.0

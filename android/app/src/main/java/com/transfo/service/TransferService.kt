@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -54,7 +55,12 @@ class TransferService : Service() {
             else -> {
                 val fileName = intent?.getStringExtra(EXTRA_FILE_NAME) ?: "File Transfer"
                 val notification = buildNotification(fileName, 0)
-                startForeground(NOTIFICATION_ID, notification)
+                // Android 14+ crashes without an explicit foreground-service type.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
             }
         }
         return START_NOT_STICKY

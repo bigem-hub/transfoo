@@ -147,5 +147,8 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', version: '1.1.0', timestamp: new Date().toISOString() });
 });
 
-// Export for Vercel
-export default app;
+// Vercel serverless entry point. A plain (req, res) handler (instead of
+// exporting the Express app object) guarantees the platform invokes it.
+export default function handler(req, res) {
+    return app(req, res);
+}

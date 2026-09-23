@@ -23,4 +23,13 @@
     <ProjectReference Include="..\Transfo.Interop\Transfo.Interop.csproj" />
   </ItemGroup>
 
+  <!-- Embed the web shell so the single-file exe is truly standalone.
+       The downloads/ folder (hundreds of MB of installers) is excluded. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\website\dist\**" LogicalName="webdist/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Remove="..\..\website\dist\downloads\**" />
+  </ItemGroup>
+
 </Project>

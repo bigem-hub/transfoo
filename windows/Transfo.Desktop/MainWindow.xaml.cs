@@ -35,14 +35,8 @@ public partial class MainWindow : Window
             var env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(AppDataPath(), "WebView2"), null);
             await Web.EnsureCoreWebView2Async(env);
 
-            string dist = Path.Combine(AppContext.BaseDirectory, "dist");
-            if (!Directory.Exists(dist))
-            {
-                string probe = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, @"..\..\..\..\..\website\dist"));
-                if (Directory.Exists(probe)) dist = probe;
-            }
-
-            _server = new LocalHttpServer(dist);
+            // Web shell is embedded in the exe; no loose dist folder needed.
+            _server = new LocalHttpServer();
 
             _bridge = new Bridge(Web.CoreWebView2, Web.Dispatcher);
             Web.CoreWebView2.WebMessageReceived += Bridge_WebMessageReceived;

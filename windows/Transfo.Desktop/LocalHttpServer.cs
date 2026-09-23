@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -8,16 +9,21 @@ using System.Threading.Tasks;
 namespace Transfo.Desktop;
 
 /// <summary>
-/// Minimal HTTP server for serving the WebView2 shell and providing built-in
-/// local API endpoints (auth, pairing, chunked transfer) when running standalone.
+/// Self-contained HTTP server for the WebView2 shell.
+/// The web shell (website/dist, excluding downloads/) is embedded in the exe
+/// as manifest resources, so the downloaded single file works with no
+/// loose dist folder next to it. Local /api/* endpoints let the app run
+/// standalone without an external Node.js server.
 /// </summary>
 public sealed class LocalHttpServer : IDisposable
 {
+    private const string ResourcePrefix = "webdist/";
+
     private readonly HttpListener _listener;
-    private readonly string _root;
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _runTask;
     private readonly string _transferRoot;
+    private readonly Dictionary<string, byte[]> _files;
 
     private readonly ConcurrentDictionary<string, (long created, string name)> _pairCache = new();
 
@@ -35,9 +41,9 @@ public sealed class LocalHttpServer : IDisposable
 
     public int Port { get; }
 
-    public LocalHttpServer(string root)
+    public LocalHttpServer()
     {
-        _root = Path.GetFullPath(root);
+        _files = LoadEmbeddedFiles();
         _transferRoot = Path.Combine(Path.GetTempPath(), "transfo-transfers");
         Directory.CreateDirectory(_transferRoot);
 
@@ -52,6 +58,23 @@ public sealed class LocalHttpServer : IDisposable
         _listener.Start();
         Port = port;
         _runTask = RunAsync();
+    }
+
+    private static Dictionary<string, byte[]> LoadEmbeddedFiles()
+    {
+        var map = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        var asm = Assembly.GetExecutingAssembly();
+        foreach (var name in asm.GetManifestResourceNames())
+        {
+            if (!name.StartsWith(ResourcePrefix, StringComparison.OrdinalIgnoreCase)) continue;
+            var key = name.Substring(ResourcePrefix.Length).Replace('\\', '/').TrimStart('/');
+            using var s = asm.GetManifestResourceStream(name);
+            if (s is null) continue;
+            using var ms = new MemoryStream();
+            s.CopyTo(ms);
+            map[key] = ms.ToArray();
+        }
+        return map;
     }
 
     private async Task RunAsync()
@@ -91,43 +114,39 @@ public sealed class LocalHttpServer : IDisposable
             }
 
             if (string.IsNullOrEmpty(path) || path == "/") path = "/app.html";
-            path = path.TrimStart('/');
+            string key = path.TrimStart('/');
 
-            var fullPath = Path.GetFullPath(Path.Combine(_root, path.Replace('/', Path.DirectorySeparatorChar)));
-            if (!fullPath.StartsWith(_root + Path.DirectorySeparatorChar) && fullPath != _root)
-            {
-                Respond(res, 403, "Forbidden");
-                return;
-            }
-
-            if (!File.Exists(fullPath))
+            if (!_files.TryGetValue(key, out var bytes))
             {
                 // SPA fallback
-                var fallback = Path.Combine(_root, "app.html");
-                if (File.Exists(fallback)) fullPath = fallback;
-                else { Respond(res, 404, "Not Found"); return; }
+                if (!_files.TryGetValue("app.html", out bytes))
+                {
+                    Respond(res, 500, "Transfo shell is missing from this build (webdist/app.html not embedded). Rebuild the website (npm run build) and republish the desktop app.");
+                    return;
+                }
             }
 
-            var ext = Path.GetExtension(fullPath).ToLowerInvariant();
-            var mime = ext switch
+            var ext = Path.GetExtension(key).ToLowerInvariant();
+            res.ContentType = ext switch
             {
-                ".html" => "text/html; charset=utf-8",
-                ".js" => "text/javascript; charset=utf-8",
+                ".html" or ".htm" => "text/html; charset=utf-8",
+                ".js" or ".mjs" => "text/javascript; charset=utf-8",
                 ".css" => "text/css; charset=utf-8",
                 ".svg" => "image/svg+xml",
                 ".png" => "image/png",
                 ".ico" => "image/x-icon",
-                ".json" => "application/json",
+                ".json" => "application/json; charset=utf-8",
+                ".txt" => "text/plain; charset=utf-8",
+                ".xml" => "application/xml",
+                ".webmanifest" => "application/manifest+json",
                 ".woff2" => "font/woff2",
-                _ => "application/octet-stream"
+                ".wasm" => "application/wasm",
+                _ => "application/octet-stream",
             };
-
-            var bytes = await File.ReadAllBytesAsync(fullPath);
-            res.ContentType = mime;
             res.ContentLength64 = bytes.Length;
             res.StatusCode = 200;
-            await res.OutputStream.WriteAsync(bytes);
-            await res.OutputStream.FlushAsync();
+            await res.OutputStream.WriteAsync(bytes).ConfigureAwait(false);
+            await res.OutputStream.FlushAsync().ConfigureAwait(false);
         }
         catch
         {
@@ -135,7 +154,7 @@ public sealed class LocalHttpServer : IDisposable
         }
         finally
         {
-            ctx.Response.Close();
+            try { ctx.Response.Close(); } catch { }
         }
     }
 
@@ -352,7 +371,7 @@ public sealed class LocalHttpServer : IDisposable
     {
         var bytes = Encoding.UTF8.GetBytes(msg);
         res.StatusCode = code;
-        res.ContentType = "text/plain";
+        res.ContentType = "text/plain; charset=utf-8";
         res.ContentLength64 = bytes.Length;
         res.OutputStream.Write(bytes);
         res.Close();

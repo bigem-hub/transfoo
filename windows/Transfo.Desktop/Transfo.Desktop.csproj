@@ -19,6 +19,8 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2045.28" />
   </ItemGroup>
 
+
+
   <ItemGroup>
     <ProjectReference Include="..\Transfo.Interop\Transfo.Interop.csproj" />
   </ItemGroup>
@@ -31,5 +33,16 @@
   <ItemGroup>
     <EmbeddedResource Remove="..\..\website\dist\downloads\**" />
   </ItemGroup>
+
+  <!-- Production size optimizations (Release only): drop ICU data
+       (invariant globalization) and ship no debug symbols.
+       (Trimming is unsupported for WPF/WinForms by the .NET SDK, so the
+       WinForms-free codebase still ships untrimmed for reliability.) -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <DebuggerSupport>false</DebuggerSupport>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
 
 </Project>

@@ -21,14 +21,19 @@ data class DiscoveredPeer(
 
 class UdpDiscovery(private val discoveryPort: Int = 4001) {
 
-    suspend fun listen(onPeerFound: (DiscoveredPeer) -> Unit) = withContext(Dispatchers.IO) {
+    suspend fun listen(
+        onPeerFound: (DiscoveredPeer) -> Unit,
+        onLog: (String) -> Unit = {}
+    ) = withContext(Dispatchers.IO) {
         var socket: DatagramSocket? = null
         try {
-            socket = DatagramSocket(discoveryPort).apply {
+            socket = DatagramSocket(null).apply {
                 broadcast = true
                 reuseAddress = true
+                bind(java.net.InetSocketAddress(discoveryPort))
                 soTimeout = 2000
             }
+            onLog("Listening on UDP port $discoveryPort")
             val buffer = ByteArray(2048)
             val packet = DatagramPacket(buffer, buffer.size)
 
@@ -38,36 +43,65 @@ class UdpDiscovery(private val discoveryPort: Int = 4001) {
                     val text = String(packet.data, 0, packet.length)
                     val senderIp = packet.address?.hostAddress ?: continue
 
-                    val json = JSONObject(text)
-                    val deviceId = json.optString("deviceId").ifEmpty { json.optString("id") }
-                    val deviceName = json.optString("deviceName").ifEmpty { json.optString("name", "Transfo Peer") }
-                    val port = json.optInt("port", 8765)
+                    try {
+                        val json = JSONObject(text)
+                        val deviceId = json.optString("deviceId").ifEmpty { json.optString("id") }
+                        val deviceName = json.optString("deviceName").ifEmpty { json.optString("name", "Transfo Peer") }
+                        val port = json.optInt("port", 4000)
 
-                    if (deviceId.isNotEmpty()) {
-                        val peer = DiscoveredPeer(
-                            id = deviceId,
-                            name = deviceName,
-                            ip = senderIp,
-                            port = port,
-                            lastSeen = System.currentTimeMillis()
-                        )
-                        onPeerFound(peer)
+                        if (deviceId.isNotEmpty()) {
+                            val peer = DiscoveredPeer(
+                                id = deviceId,
+                                name = deviceName,
+                                ip = senderIp,
+                                port = port,
+                                lastSeen = System.currentTimeMillis()
+                            )
+                            onPeerFound(peer)
+                        } else {
+                            onLog("Ignored packet without deviceId from $senderIp")
+                        }
+                    } catch (e: Exception) {
+                        onLog("Ignored malformed packet from $senderIp (${text.length} bytes)")
                     }
                 } catch (e: java.net.SocketTimeoutException) {
                     // Normal timeout to check coroutine isActive
                 } catch (e: Exception) {
-                    // Ignore malformed packets
+                    onLog("Receive error: ${e.message}")
                 }
             }
         } catch (e: Exception) {
-            // Socket bind error
+            onLog("Could not bind UDP port $discoveryPort: ${e.message}")
         } finally {
             socket?.close()
         }
     }
 
-    suspend fun broadcastAnnouncement(deviceId: String, deviceName: String, servicePort: Int = 4000) = withContext(Dispatchers.IO) {
+    /** Targets for announces: every interface subnet broadcast + global fallback. */
+    fun broadcastTargets(): List<InetAddress> {
+        val out = LinkedHashSet<InetAddress>()
+        try {
+            val ifaces = NetworkInterface.getNetworkInterfaces() ?: return listOf(InetAddress.getByName("255.255.255.255"))
+            for (nif in ifaces) {
+                if (nif.isLoopback || !nif.isUp) continue
+                for (ia in nif.interfaceAddresses) {
+                    val bcast = ia.broadcast
+                    if (bcast != null) out.add(bcast)
+                }
+            }
+        } catch (e: Exception) { /* fall through to global */ }
+        out.add(InetAddress.getByName("255.255.255.255"))
+        return out.toList()
+    }
+
+    suspend fun broadcastAnnouncement(
+        deviceId: String,
+        deviceName: String,
+        servicePort: Int = 4000,
+        onLog: (String) -> Unit = {}
+    ): Int = withContext(Dispatchers.IO) {
         var socket: DatagramSocket? = null
+        var sent = 0
         try {
             socket = DatagramSocket().apply {
                 broadcast = true
@@ -79,14 +113,41 @@ class UdpDiscovery(private val discoveryPort: Int = 4001) {
                 put("ts", System.currentTimeMillis())
             }
             val bytes = json.toString().toByteArray(Charsets.UTF_8)
-            val broadcastAddr = InetAddress.getByName("255.255.255.255")
-            val packet = DatagramPacket(bytes, bytes.size, broadcastAddr, discoveryPort)
-            socket.send(packet)
+            for (target in broadcastTargets()) {
+                try {
+                    socket.send(DatagramPacket(bytes, bytes.size, target, discoveryPort))
+                    sent++
+                } catch (e: Exception) {
+                    onLog("Announce failed via ${target.hostAddress}: ${e.message}")
+                }
+            }
+            if (sent > 0) onLog("Announced $deviceName to $sent network(s)")
         } catch (e: Exception) {
-            // Broadcast error
+            onLog("Announce error: ${e.message}")
         } finally {
             socket?.close()
         }
+        sent
+    }
+
+    /** Repeating announcer. Cancels with the caller's coroutine scope. */
+    suspend fun announceLoop(
+        deviceId: String,
+        deviceName: String,
+        servicePort: Int = 4000,
+        intervalMs: Long = 3000,
+        onLog: (String) -> Unit = {}
+    ) = withContext(Dispatchers.IO) {
+        onLog("Announcer started (every ${intervalMs}ms)")
+        while (coroutineContext.isActive) {
+            broadcastAnnouncement(deviceId, deviceName, servicePort, onLog)
+            try {
+                kotlinx.coroutines.delay(intervalMs)
+            } catch (e: Exception) {
+                break
+            }
+        }
+        onLog("Announcer stopped")
     }
 
     companion object {

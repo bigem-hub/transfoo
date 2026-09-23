@@ -94,14 +94,18 @@ public sealed class Bridge : IDisposable
                         _runtime.DeviceId = App.Config.DeviceId;
                         _runtime.DeviceName = App.Config.DeviceName;
                         int rc = _runtime.StartDiscovery(servicePort);
+                        DiscLog($"start rc={rc} id={_runtime.DeviceId} name={_runtime.DeviceName} servicePort={servicePort}" + (rc != 0 ? $" err={_runtime.LastError ?? "-"}" : ""));
                         if (rc != 0) throw new InvalidOperationException(_runtime.LastError ?? $"discovery failed (rc={rc})");
                     }
                     break;
                 case "discovery.stop":
                     _runtime.StopDiscovery();
+                    DiscLog("stop");
                     break;
                 case "discovery.snapshot":
-                    data = _runtime.Snapshot().Select(d => new { d.Id, d.Name, d.Ip, d.Port, LastSeen = d.LastSeen }).ToArray();
+                    var snap = _runtime.Snapshot().Select(d => new { d.Id, d.Name, d.Ip, d.Port, LastSeen = d.LastSeen }).ToArray();
+                    DiscLog($"snapshot peers={snap.Length}");
+                    data = snap;
                     break;
                 case "http":
                     {
@@ -191,6 +195,7 @@ public sealed class Bridge : IDisposable
 
     private void OnDevice(Transfo.Interop.DeviceInfo d)
     {
+        DiscLog($"peer name={d.Name} ip={d.Ip} port={d.Port} id={d.Id}");
         lock (_discoveryLock) _devicesDirty = true;
         _dispatcher.BeginInvoke(FlushDiscovery);
     }
@@ -257,6 +262,21 @@ public sealed class Bridge : IDisposable
     {
         if (_core == null || !Environment.GetCommandLineArgs().Contains("--selftest")) return;
         try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "transfo-bridge.log"), line + Environment.NewLine); } catch { }
+    }
+
+    /* Always-on, lightweight discovery diagnostics for users:
+     * %LOCALAPPDATA%\Transfo\discovery.log shows start/stop, each peer seen
+     * on the wire (name + ip:port), and snapshot counts. */
+    private void DiscLog(string line)
+    {
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Transfo");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(Path.Combine(dir, "discovery.log"),
+                DateTime.Now.ToString("HH:mm:ss") + " " + line + Environment.NewLine);
+        }
+        catch { }
     }
 
     /* ---- HTTP via managed client (HTTPS cloud + native fallback) ---- */

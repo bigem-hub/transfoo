@@ -83,9 +83,26 @@ public partial class MainWindow : Window
             await Task.Delay(4000);
             string rt = await Web.CoreWebView2.ExecuteScriptAsync("JSON.stringify(window.__rt || 'no-channel')");
             Log("ROUNDTRIP " + rt);
+            // Discovery probe: start the native UDP listener, wait past one
+            // 5 s announce tick, then snapshot. Any live peer (or our own
+            // reflected traffic) proves the native receive path.
+            await Web.CoreWebView2.ExecuteScriptAsync(
+                "(function(){ window.__disc = 'pending'; var base = 988000;" +
+                " function h(e){ var m = (typeof e.data === 'string') ? JSON.parse(e.data) : e.data;" +
+                " if (m && m.id === base + 2 && (m.type === 'result' || m.type === 'error'))" +
+                " { window.__disc = m.type + ':' + JSON.stringify(m.data !== undefined ? m.data : m.error).slice(0, 400); } }" +
+                " window.chrome.webview.addEventListener('message', h);" +
+                " window.chrome.webview.postMessage({ id: base, cmd: 'discovery.start', args: {} });" +
+                " setTimeout(function(){ window.chrome.webview.postMessage({ id: base + 2, cmd: 'discovery.snapshot', args: {} }); }, 7000);" +
+                " setTimeout(function(){ window.chrome.webview.postMessage({ id: base + 3, cmd: 'discovery.stop', args: {} }); }, 9000);" +
+                " })()");
+            await Task.Delay(11000);
+            string disc = await Web.CoreWebView2.ExecuteScriptAsync("JSON.stringify(window.__disc || 'no-channel')");
+            Log("DISCOVERY " + disc);
             string json = await Web.CoreWebView2.ExecuteScriptAsync(
                 "JSON.stringify({title: document.title, preview: !(window.chrome && window.chrome.webview), " +
                 "roundtrip: window.__rt || 'no-channel', " +
+                "discovery: window.__disc || 'no-channel', " +
                 "text: document.body ? document.body.innerText.slice(0, 4000) : ''})");
             var dir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             var png = Path.Combine(dir, "transfo-selftest.png");

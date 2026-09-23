@@ -4,6 +4,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
+#include <iphlpapi.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -140,6 +141,49 @@ static DWORD WINAPI listener_thread(LPVOID arg) {
     return 0;
 }
 
+/* Collect subnet broadcast addresses for every up, non-loopback IPv4
+ * interface (plus the global 255.255.255.255). Sending on each interface
+ * keeps discovery working when VPNs/virtual NICs hijack the default route.
+ * Returns count written to out[] (capacity maxOut). */
+static int collect_broadcasts(unsigned long* out, int maxOut) {
+    int n = 0;
+    ULONG buflen = 15 * 1024;
+    IP_ADAPTER_ADDRESSES* addrs = (IP_ADAPTER_ADDRESSES*)malloc(buflen);
+    if (!addrs) return 0;
+    ULONG rc = GetAdaptersAddresses(AF_INET, 0, NULL, addrs, &buflen);
+    if (rc == ERROR_BUFFER_OVERFLOW) {
+        free(addrs);
+        addrs = (IP_ADAPTER_ADDRESSES*)malloc(buflen);
+        if (!addrs) return 0;
+        rc = GetAdaptersAddresses(AF_INET, 0, NULL, addrs, &buflen);
+    }
+    if (rc == NO_ERROR) {
+        for (IP_ADAPTER_ADDRESSES* a = addrs; a && n < maxOut; a = a->Next) {
+            if (a->OperStatus != IfOperStatusUp) continue;
+            if (a->IfType == IF_TYPE_SOFTWARE_LOOPBACK) continue;
+            for (IP_ADAPTER_UNICAST_ADDRESS* u = a->FirstUnicastAddress;
+                 u && n < maxOut; u = u->Next) {
+                if (u->Address.lpSockaddr->sa_family != AF_INET) continue;
+                struct sockaddr_in* si = (struct sockaddr_in*)u->Address.lpSockaddr;
+                unsigned long ip = ntohl(si->sin_addr.s_addr);
+                unsigned char b1 = (ip >> 24) & 0xff;
+                if (b1 == 127 || ip == 0) continue;
+                unsigned long mask;
+                if (u->OnLinkPrefixLength >= 32) mask = 0xFFFFFFFFUL;
+                else if (u->OnLinkPrefixLength <= 0) mask = 0xFFFFFF00UL; /* /24 guess */
+                else mask = 0xFFFFFFFFUL << (32 - u->OnLinkPrefixLength);
+                unsigned long bcast = (ip & mask) | (~mask & 0xFFFFFFFFUL);
+                if (bcast == 0 || bcast == 0xFFFFFFFFUL) continue;
+                int dup = 0;
+                for (int i = 0; i < n; i++) if (out[i] == bcast) { dup = 1; break; }
+                if (!dup) out[n++] = bcast;
+            }
+        }
+    }
+    free(addrs);
+    return n;
+}
+
 static void announce_once(void) {
     if (g_annSock == INVALID_SOCKET) return;
     cJSON* j = cJSON_CreateObject();
@@ -152,13 +196,27 @@ static void announce_once(void) {
     cJSON_Delete(j);
     if (!text) return;
 
-    struct sockaddr_in dst;
-    memset(&dst, 0, sizeof dst);
-    dst.sin_family = AF_INET;
-    dst.sin_port = htons((unsigned short)TRC_DISCOVERY_PORT);
-    dst.sin_addr.s_addr = htonl(INADDR_BROADCAST);
-    sendto(g_annSock, text, (int)strlen(text), 0,
-           (struct sockaddr*)&dst, sizeof dst);
+    unsigned long targets[16];
+    int n = collect_broadcasts(targets, 16);
+    for (int i = 0; i < n; i++) {
+        struct sockaddr_in dst;
+        memset(&dst, 0, sizeof dst);
+        dst.sin_family = AF_INET;
+        dst.sin_port = htons((unsigned short)TRC_DISCOVERY_PORT);
+        dst.sin_addr.s_addr = htonl(targets[i]);
+        sendto(g_annSock, text, (int)strlen(text), 0,
+               (struct sockaddr*)&dst, sizeof dst);
+    }
+    /* global broadcast as a final fallback */
+    {
+        struct sockaddr_in dst;
+        memset(&dst, 0, sizeof dst);
+        dst.sin_family = AF_INET;
+        dst.sin_port = htons((unsigned short)TRC_DISCOVERY_PORT);
+        dst.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+        sendto(g_annSock, text, (int)strlen(text), 0,
+               (struct sockaddr*)&dst, sizeof dst);
+    }
     free(text);
 }
 

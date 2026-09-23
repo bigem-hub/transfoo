@@ -104,9 +104,9 @@ fun ModernTransfoApp() {
 
     var selectedTab by remember { mutableStateOf(NavTab.DISCOVER) }
 
-    // State Variables
-    var targetIp by remember { mutableStateOf("https://transfoo.vercel.app") }
-    var targetPort by remember { mutableIntStateOf(443) }
+    // State Variables (LAN-first: discovery + transfers run over the local network)
+    var targetIp by remember { mutableStateOf("192.168.1.100") }
+    var targetPort by remember { mutableIntStateOf(4000) }
     var authToken by remember { mutableStateOf("") }
     var statusText by remember { mutableStateOf("Ready to connect") }
     var logs by remember { mutableStateOf(listOf("Transfo Native v1.1.0 initialized.")) }
@@ -121,8 +121,10 @@ fun ModernTransfoApp() {
     var transferSpeed by remember { mutableStateOf("0 KB/s") }
     var isTransferring by remember { mutableStateOf(false) }
 
-    // Cloud mode - default to true for online/production use
-    var isCloudMode by remember { mutableStateOf(true) }
+    // LAN mode is the default: discovery + transfers stay on the local network.
+    var isCloudMode by remember { mutableStateOf(false) }
+
+    val ownDeviceId = remember { "android-${android.os.Build.MODEL}" }
 
     // Handshake PIN state
     var pairPinCode by remember { mutableStateOf("") }
@@ -131,15 +133,40 @@ fun ModernTransfoApp() {
         logs = (logs + "[${System.currentTimeMillis() % 100000 / 1000}s] $msg").takeLast(60)
     }
 
-    // Auto LAN Discovery Listener
+    // Auto LAN Discovery: listen continuously + announce ourselves every 3 s
+    // while scanning, so the PC finds us even if it started listening later.
     LaunchedEffect(isDiscovering) {
         if (isDiscovering) {
             addLog("LAN Radar scanning active on UDP port 4001...")
-            discovery.listen { peer ->
-                if (!discoveredPeers.any { it.ip == peer.ip }) {
-                    discoveredPeers = discoveredPeers + peer
-                    addLog("Found device: ${peer.name} @ ${peer.ip}:${peer.port}")
-                }
+            val listenJob = launch {
+                discovery.listen(
+                    onPeerFound = { peer ->
+                        if (peer.id == ownDeviceId) return@listen // ignore our own echo
+                        if (!discoveredPeers.any { it.id == peer.id }) {
+                            discoveredPeers = discoveredPeers + peer
+                            addLog("Found device: ${peer.name} @ ${peer.ip}:${peer.port}")
+                        } else {
+                            discoveredPeers = discoveredPeers.map {
+                                if (it.id == peer.id) peer else it
+                            }
+                        }
+                    },
+                    onLog = { addLog(it) }
+                )
+            }
+            val announceJob = launch {
+                discovery.announceLoop(
+                    deviceId = ownDeviceId,
+                    deviceName = android.os.Build.MODEL,
+                    servicePort = 4000,
+                    intervalMs = 3000,
+                    onLog = { addLog(it) }
+                )
+            }
+            try {
+                listenJob.join()
+            } finally {
+                announceJob.cancel()
             }
         }
     }

@@ -40,4 +40,13 @@ Name: "{autodesktop}\Transfo"; Filename: "{app}\Transfo.Desktop.exe"; Tasks: des
 Name: desktopicon; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"
 
 [Run]
+; Firewall exceptions so LAN discovery (UDP 4001) and the bundled API server
+; (TCP 4000) work without manual setup. Best-effort: silently skipped when the
+; installer runs without admin rights; Windows still prompts on first listen.
+Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""Transfo Discovery (UDP 4001)"" dir=in action=allow protocol=UDP localport=4001 program=""{app}\Transfo.Desktop.exe"""; Flags: runhidden; StatusMsg: "Configuring firewall for LAN discovery..."
+Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""Transfo Server (TCP 4000)"" dir=in action=allow protocol=TCP localport=4000 program=""{app}\node\node.exe"""; Flags: runhidden; StatusMsg: "Configuring firewall for LAN transfers..."
 Filename: "{app}\Transfo.Desktop.exe"; Description: "Launch Transfo"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""Transfo Discovery (UDP 4001)"""; Flags: runhidden
+Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""Transfo Server (TCP 4000)"""; Flags: runhidden

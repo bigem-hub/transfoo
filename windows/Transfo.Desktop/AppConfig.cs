@@ -14,8 +14,8 @@ public sealed class AppConfig
 
     public string DeviceId { get; set; } = "";
     public string DeviceName { get; set; } = "MY-PC";
-    public string ServerUrl { get; set; } = "http://localhost";
-    public int Port { get; set; } = 4000;
+    public string ServerUrl { get; set; } = "https://transfoo.vercel.app";
+    public int Port { get; set; } = 443;
     public string DownloadDir { get; set; } = "";
     public bool Discovery { get; set; } = true;
 

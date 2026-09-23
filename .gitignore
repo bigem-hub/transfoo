@@ -35,9 +35,13 @@ verify-*.png
 verify-*.log
 verify.js
 
-# Website large binaries (hosted on GitHub Releases)
+# Website downloads: binaries served directly by Vercel (repo is private,
+# so GitHub Release assets would 404 for the public). Keep only the two
+# small-enough files tracked; everything else under downloads/ stays out.
 website/public/downloads/*.exe
 website/public/downloads/*.apk
+!website/public/downloads/Transfo-Setup.exe
+!website/public/downloads/Transfo.apk
 
 # Installer staging + output (built locally by stage.ps1)
 windows/installer/stage/

@@ -90,7 +90,12 @@ public sealed class Bridge : IDisposable
                     break;
                 case "discovery.start":
                     {
-                        int servicePort = GetInt(args, "servicePort", App.Config.Port);
+                        // Announce the port LAN peers can actually reach: the local
+                        // server we manage (bundled node or a reused one), falling
+                        // back to the configured port.
+                        int servicePort = App.Server is { Port: > 0 }
+                            ? App.Server.Port
+                            : GetInt(args, "servicePort", App.Config.Port);
                         _runtime.DeviceId = App.Config.DeviceId;
                         _runtime.DeviceName = App.Config.DeviceName;
                         int rc = _runtime.StartDiscovery(servicePort);

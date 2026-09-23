@@ -8,9 +8,11 @@ namespace Transfo.Desktop;
 
 /// <summary>
 /// Boots the bundled Transfo node server (server.js) as a hidden child process
-/// so the desktop app works with zero manual setup: no terminal, no npm, no
-/// separate server window. The child is killed when the app exits.
-/// Only manages loopback servers; remote/cloud URLs are left alone.
+/// so LAN discovery, pairing and transfers work with zero manual setup:
+/// no terminal, no npm, no separate server window. The child is killed when
+/// the app exits. A local server is ALWAYS ensured (it is what LAN peers
+/// connect to); the user's configured server URL is only rewritten when it
+/// already points at loopback, so cloud settings survive untouched.
 /// </summary>
 public sealed class NodeServer : IDisposable
 {
@@ -25,38 +27,34 @@ public sealed class NodeServer : IDisposable
     private NodeServer() { }
 
     /// <summary>
-    /// Ensures a Transfo server answers at the configured loopback address.
-    /// Updates <paramref name="config"/> in memory to the port actually used.
-    /// Never throws: on any failure the app continues and shows offline.
+    /// Ensures a LOCAL Transfo server is answering for LAN peers.
+    /// The configured server URL is only rewritten when it already points at
+    /// loopback; remote/cloud settings are left untouched. Never throws.
     /// </summary>
     public static NodeServer EnsureFor(AppConfig config)
     {
         var mgr = new NodeServer();
         try
         {
-            if (!IsLoopback(config.ServerUrl)) return mgr;
+            bool loopback = IsLoopback(config.ServerUrl);
+            int want = loopback && config.Port > 0 ? config.Port : 4000;
 
-            int want = config.Port > 0 ? config.Port : 4000;
-            if (IsPortFree(want) || IsHealthy(want))
+            // Reuse a healthy server if one already answers here.
+            if (!IsPortFree(want) && IsHealthy(want))
             {
-                // Free: we will start node here. Healthy: someone (maybe us,
-                // maybe the user) already serves Transfo here; reuse it.
-                if (IsPortFree(want))
-                {
-                    if (mgr.TryStart(config, want)) return mgr;
-                    // Start failed: fall through to a free port.
-                }
-                else
-                {
-                    mgr.Port = want;
-                    config.Port = want;
-                    return mgr;
-                }
+                mgr.Port = want;
+                if (loopback) config.Port = want;
+                return mgr;
             }
-
+            // Start our own child when the port is free.
+            if (IsPortFree(want))
+            {
+                if (mgr.TryStart(config, want, loopback)) return mgr;
+            }
+            // Otherwise take any free port.
             int free = FindFreePort();
-            config.Port = free;
-            mgr.TryStart(config, free);
+            if (loopback) config.Port = free;
+            mgr.TryStart(config, free, loopback);
             return mgr;
         }
         catch
@@ -65,7 +63,7 @@ public sealed class NodeServer : IDisposable
         }
     }
 
-    private bool TryStart(AppConfig config, int port)
+    private bool TryStart(AppConfig config, int port, bool syncConfig)
     {
         try
         {
@@ -114,8 +112,11 @@ public sealed class NodeServer : IDisposable
             _child = proc;
             Port = port;
             OwnsServer = true;
-            config.ServerUrl = "http://127.0.0.1";
-            config.Port = port;
+            if (syncConfig)
+            {
+                config.ServerUrl = "http://127.0.0.1";
+                config.Port = port;
+            }
             AppendLog(logPath, $"Transfo desktop started bundled server on 127.0.0.1:{port}");
             return true;
         }

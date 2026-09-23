@@ -46,14 +46,24 @@ public sealed class Bridge : IDisposable
 
     public void HandleMessage(string? raw)
     {
-        string? id = null;
+        object? id = null;
         try
         {
             if (string.IsNullOrWhiteSpace(raw)) return;
             Log("R " + raw);
             using var doc = JsonDocument.Parse(raw);
             var root = doc.RootElement;
-            id = GetString(root, "id");
+            // The shell sends numeric ids (++seq); echo them back verbatim so
+            // the page can match responses to pending invoke() calls.
+            if (root.TryGetProperty("id", out var idProp))
+            {
+                id = idProp.ValueKind switch
+                {
+                    JsonValueKind.Number when idProp.TryGetInt64(out long l) => l,
+                    JsonValueKind.String => idProp.GetString(),
+                    _ => idProp.GetRawText(),
+                };
+            }
             string cmd = GetString(root, "cmd") ?? "";
             JsonElement args = default;
             if (root.TryGetProperty("args", out var a)) args = a;
@@ -217,7 +227,7 @@ public sealed class Bridge : IDisposable
 
     /* ---- responses ---- */
 
-    private void PostResponse(string? id, bool ok, object? data, string? error)
+    private void PostResponse(object? id, bool ok, object? data, string? error)
     {
         var payload = JsonSerializer.Serialize(ok
             ? new Dictionary<string, object?> { ["type"] = "result", ["id"] = id, ["data"] = data }

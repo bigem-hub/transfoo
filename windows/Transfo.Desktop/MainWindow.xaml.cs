@@ -70,8 +70,20 @@ public partial class MainWindow : Window
         try
         {
             await Task.Delay(15000);
+            // Round-trip probe: page -> host -> page. Must resolve, not time out.
+            await Web.CoreWebView2.ExecuteScriptAsync(
+                "(function(){ window.__rt = 'pending'; var id = 987001;" +
+                " function h(e){ var m = (typeof e.data === 'string') ? JSON.parse(e.data) : e.data;" +
+                " if (m && (m.type === 'result' || m.type === 'error') && m.id === id)" +
+                " { window.__rt = m.type + ':' + JSON.stringify(m.data || m.error); window.chrome.webview.removeEventListener('message', h); } }" +
+                " window.chrome.webview.addEventListener('message', h);" +
+                " window.chrome.webview.postMessage({ id: id, cmd: 'ping', args: {} }); })()");
+            await Task.Delay(3000);
+            string rt = await Web.CoreWebView2.ExecuteScriptAsync("JSON.stringify(window.__rt || 'no-channel')");
+            Log("ROUNDTRIP " + rt);
             string json = await Web.CoreWebView2.ExecuteScriptAsync(
                 "JSON.stringify({title: document.title, preview: !(window.chrome && window.chrome.webview), " +
+                "roundtrip: window.__rt || 'no-channel', " +
                 "text: document.body ? document.body.innerText.slice(0, 4000) : ''})");
             var dir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             var png = Path.Combine(dir, "transfo-selftest.png");
@@ -89,7 +101,13 @@ public partial class MainWindow : Window
 
     private void Bridge_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
-        _bridge?.HandleMessage(e.TryGetWebMessageAsString());
+        // The shell posts objects ({id, cmd, args}), not strings, so read the
+        // JSON form. TryGetWebMessageAsString throws for non-string payloads,
+        // which silently dropped every page->host message.
+        string json;
+        try { json = e.WebMessageAsJson; }
+        catch { return; }
+        _bridge?.HandleMessage(json);
     }
 
     protected override void OnClosed(EventArgs e)

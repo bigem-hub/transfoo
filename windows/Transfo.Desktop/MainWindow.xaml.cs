@@ -36,7 +36,7 @@ public partial class MainWindow : Window
             await Web.EnsureCoreWebView2Async(env);
 
             // Web shell is embedded in the exe; no loose dist folder needed.
-            _server = new LocalHttpServer();
+            _server = new LocalHttpServer(Path.Combine(AppContext.BaseDirectory, "dist"));
 
             _bridge = new Bridge(Web.CoreWebView2, Web.Dispatcher);
             Web.CoreWebView2.WebMessageReceived += Bridge_WebMessageReceived;

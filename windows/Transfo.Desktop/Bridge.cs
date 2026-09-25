@@ -50,6 +50,45 @@ public sealed class Bridge : IDisposable
     public void OnNavigated()
     {
         PostEvent("host:ready", new { name = "transfo-desktop", version = "1.1.0", desktop = true });
+        _ = CheckPairingStatusAsync();
+    }
+
+private async Task CheckPairingStatusAsync()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(App.Config.ServerUrl) || string.IsNullOrEmpty(App.Config.DeviceId))
+                return;
+
+            bool isCloud = App.Config.ServerUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+            if (!isCloud) return; // Only check pairing status for cloud server
+
+            var baseUrl = App.Config.ServerUrl.TrimEnd('/');
+            var url = $"{baseUrl}/api/pairing/status?deviceId={Uri.EscapeDataString(App.Config.DeviceId)}";
+
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            var resp = await http.GetAsync(url);
+            if (resp.IsSuccessStatusCode)
+            {
+                string json = await resp.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+if (doc.RootElement.TryGetProperty("paired", out var pairedProp) && pairedProp.GetBoolean())
+                {
+                    // Paired on server but not locally - sync the state
+                    var patchJson = JsonSerializer.Serialize(new Dictionary<string, object>
+                    {
+                        ["paired"] = true,
+                        ["token"] = "synced-" + Guid.NewGuid().ToString("N")
+                    });
+                    using var patchDoc = JsonDocument.Parse(patchJson);
+                    App.Config.Merge(patchDoc.RootElement);
+                }
+            }
+        }
+        catch
+        {
+            // Ignore pairing check failures
+        }
     }
 
     public void HandleMessage(string? raw)

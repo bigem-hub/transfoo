@@ -81,7 +81,7 @@ export default function Home({ go }) {
                   </div>
                 </div>
                 <Chip tone="ok">
-                  <StatusDot tone="ok" /> lan
+                  <StatusDot tone="ok" /> LAN
                 </Chip>
               </div>
             ))}

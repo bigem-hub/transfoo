@@ -181,14 +181,14 @@ export default function Devices() {
                 <Icon name="devices" size={15} className="text-faint shrink-0" />
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium truncate">{d.name}</div>
-                  <div className="font-mono text-[11px] text-faint">
+<div className="font-mono text-[11px] text-faint">
                       {d.ip}:{d.port} · {typeof d.lastSeen === 'number' && d.lastSeen > 0 ? `${Math.max(1, Math.round((Date.now() - d.lastSeen) / 1000))}s ago` : 'just now'}
                     </div>
                 </div>
               </div>
-              <Chip tone="ok">
-                <StatusDot tone="ok" /> lan
-              </Chip>
+<Chip tone="ok">
+                  <StatusDot tone="ok" /> LAN
+                </Chip>
             </div>
           ))}
         </div>

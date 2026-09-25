@@ -4,6 +4,7 @@ const router = express.Router();
 
 // In-memory pairing-session cache (short-lived, honest per project scope).
 const pairCache = new Map();        // code -> { created, deviceName, token, user }
+const pairedDevices = new Map();    // deviceId -> { token, pairedAt, deviceName }
 const CODE_LEN = 6;
 
 function makeCode() { return String(Math.floor(100000 + Math.random()*900000)); }
@@ -11,13 +12,21 @@ function expired(ts) { return Date.now() - ts > 600000; } // 10 min
 
 router.get('/', (req, res) => { res.json({ pairing: 'ready', endpoint: '/api/pairing' }); });
 
+// Check pairing status for a device
+router.get('/status', (req, res) => {
+  const deviceId = req.query.deviceId;
+  if (!deviceId) return res.status(400).json({ error: 'deviceId required' });
+  const paired = pairedDevices.has(deviceId);
+  res.json({ paired, deviceId });
+});
+
 // Initiate pairing: generate short-lived pairing code (no permanent password stored).
 router.post('/', (req, res) => {
   const name = (req.body && req.body.deviceName) ? req.body.deviceName : 'Unknown';
   const code = makeCode();
   pairCache.set(code, { created: Date.now(), deviceName: name, token: null, user: null });
   res.json({ code, deviceName: name, expiresIn: '10m', authorize: '/api/pairing/authorize' });
-});
+}
 
 // Real handshake: provide pairing code + Bearer JWT to exchange for paired token.
 router.post('/authorize', (req, res) => {
@@ -34,6 +43,14 @@ router.post('/authorize', (req, res) => {
     sess.user = user; sess.token = token; pairCache.delete(code);
     res.json({ paired: true, deviceName: sess.deviceName, token, pairedAt: new Date().toISOString() });
   } catch (e) { res.status(401).json({ error: 'invalid JWT: '+e.message }); }
+});
+
+// Check pairing status for a device
+router.get('/status', (req, res) => {
+  const deviceId = req.query.deviceId;
+  if (!deviceId) return res.status(400).json({ error: 'deviceId required' });
+  const paired = pairedDevices.has(deviceId);
+  res.json({ paired, deviceId });
 });
 
 router.delete('/:id', (req, res) => {

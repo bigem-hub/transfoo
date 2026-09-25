@@ -1,7 +1,9 @@
 using System.IO;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 
@@ -23,6 +25,12 @@ public sealed class Bridge : IDisposable
 
     private readonly object _discoveryLock = new();
     private bool _devicesDirty;
+
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false
+    };
 
     public Bridge(CoreWebView2 core, Dispatcher dispatcher)
     {
@@ -241,7 +249,7 @@ public sealed class Bridge : IDisposable
     {
         var payload = JsonSerializer.Serialize(ok
             ? new Dictionary<string, object?> { ["type"] = "result", ["id"] = id, ["data"] = data }
-            : new Dictionary<string, object?> { ["type"] = "error", ["id"] = id, ["error"] = error ?? "host error" });
+            : new Dictionary<string, object?> { ["type"] = "error", ["id"] = id, ["error"] = error ?? "host error" }, JsonOpts);
         SafePost(payload);
     }
 
@@ -252,7 +260,7 @@ public sealed class Bridge : IDisposable
             ["type"] = "event",
             ["name"] = name,
             ["data"] = data,
-        });
+        }, JsonOpts);
         SafePost(payload);
     }
 

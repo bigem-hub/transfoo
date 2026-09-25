@@ -117,7 +117,7 @@ public sealed class NodeServer : IDisposable
                 config.ServerUrl = "http://127.0.0.1";
                 config.Port = port;
             }
-            AppendLog(logPath, $"Transfo desktop started bundled server on 127.0.0.1:{port}");
+            AppendLog(logPath, $"Transfo desktop started bundled server on 0.0.0.0:{port}");
             return true;
         }
         catch

@@ -104,25 +104,25 @@ fun ModernTransfoApp() {
 
     var selectedTab by remember { mutableStateOf(NavTab.DISCOVER) }
 
-    // State Variables (LAN-first: discovery + transfers run over the local network)
-    var targetIp by remember { mutableStateOf("192.168.1.100") }
-    var targetPort by remember { mutableIntStateOf(4000) }
-    var authToken by remember { mutableStateOf("") }
-    var statusText by remember { mutableStateOf("Ready to connect") }
-    var logs by remember { mutableStateOf(listOf("Transfo Native v1.1.0 initialized.")) }
-    var isDiscovering by remember { mutableStateOf(false) }
-    var discoveredPeers by remember { mutableStateOf(listOf<DiscoveredPeer>()) }
+// State Variables (Cloud-first: discovery + transfers run over the internet by default)
+var targetIp by remember { mutableStateOf("https://transfoo.vercel.app") }
+var targetPort by remember { mutableIntStateOf(443) }
+var authToken by remember { mutableStateOf("") }
+var statusText by remember { mutableStateOf("Ready to connect") }
+var logs by remember { mutableStateOf(listOf("Transfo Native v1.1.0 initialized.")) }
+var isDiscovering by remember { mutableStateOf(false) }
+var discoveredPeers by remember { mutableStateOf(listOf<DiscoveredPeer>()) }
 
-    // File transfer state
-    var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
-    var selectedFileName by remember { mutableStateOf("") }
-    var selectedFileSize by remember { mutableLongStateOf(0L) }
-    var transferProgress by remember { mutableFloatStateOf(0f) }
-    var transferSpeed by remember { mutableStateOf("0 KB/s") }
-    var isTransferring by remember { mutableStateOf(false) }
+// File transfer state
+var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
+var selectedFileName by remember { mutableStateOf("") }
+var selectedFileSize by remember { mutableLongStateOf(0L) }
+var transferProgress by remember { mutableFloatStateOf(0f) }
+var transferSpeed by remember { mutableStateOf("0 KB/s") }
+var isTransferring by remember { mutableStateOf(false) }
 
-    // LAN mode is the default: discovery + transfers stay on the local network.
-    var isCloudMode by remember { mutableStateOf(false) }
+// Cloud mode - default to true for online/production use
+var isCloudMode by remember { mutableStateOf(true) }
 
     val ownDeviceId = remember { "android-${android.os.Build.MODEL}" }
 

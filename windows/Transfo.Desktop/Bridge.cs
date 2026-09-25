@@ -98,16 +98,17 @@ public sealed class Bridge : IDisposable
                     break;
                 case "discovery.start":
                     {
-                        // Announce the port LAN peers can actually reach: the local
-                        // server we manage (bundled node or a reused one), falling
-                        // back to the configured port.
-                        int servicePort = App.Server is { Port: > 0 }
-                            ? App.Server.Port
-                            : GetInt(args, "servicePort", App.Config.Port);
+                        // Announce the port peers can actually reach.
+                        // If configured for cloud (https), use the cloud port (443).
+                        // Otherwise use the local server port for LAN-only mode.
+                        bool isCloud = App.Config.ServerUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+                        int servicePort = isCloud
+                            ? 443
+                            : (App.Server is { Port: > 0 } ? App.Server.Port : GetInt(args, "servicePort", App.Config.Port));
                         _runtime.DeviceId = App.Config.DeviceId;
                         _runtime.DeviceName = App.Config.DeviceName;
                         int rc = _runtime.StartDiscovery(servicePort);
-                        DiscLog($"start rc={rc} id={_runtime.DeviceId} name={_runtime.DeviceName} servicePort={servicePort}" + (rc != 0 ? $" err={_runtime.LastError ?? "-"}" : ""));
+                        DiscLog($"start rc={rc} id={_runtime.DeviceId} name={_runtime.DeviceName} servicePort={servicePort} cloud={isCloud}" + (rc != 0 ? $" err={_runtime.LastError ?? "-"}" : ""));
                         if (rc != 0) throw new InvalidOperationException(_runtime.LastError ?? $"discovery failed (rc={rc})");
                     }
                     break;

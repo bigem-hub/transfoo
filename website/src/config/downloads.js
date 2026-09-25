@@ -9,7 +9,7 @@ export const downloads = {
     label: "Windows 10 / 11",
     filename: "Transfo-Setup.exe",
     url: "/downloads/Transfo-Setup.exe",
-    size: "68 MB",
+    size: "156 MB",
   },
   android: {
     version: "1.1.0",

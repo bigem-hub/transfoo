@@ -11,13 +11,15 @@ namespace Transfo.Desktop;
 public sealed class AppConfig
 {
     private const string FileName = "config.json";
+    private const int CurrentConfigVersion = 2;
 
     public string DeviceId { get; set; } = "";
     public string DeviceName { get; set; } = "MY-PC";
-    public string ServerUrl { get; set; } = "http://localhost";
-    public int Port { get; set; } = 4000;
+    public string ServerUrl { get; set; } = "https://transfoo.vercel.app";
+    public int Port { get; set; } = 443;
     public string DownloadDir { get; set; } = "";
     public bool Discovery { get; set; } = true;
+    public int ConfigVersion { get; set; } = 1;
 
     private static string FilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Transfo", FileName);
@@ -29,6 +31,7 @@ public sealed class AppConfig
         port = Port,
         downloadDir = DownloadDir,
         discovery = Discovery,
+        configVersion = CurrentConfigVersion,
     };
 
     public void Load()
@@ -38,12 +41,50 @@ public sealed class AppConfig
             if (!File.Exists(FilePath)) return;
             using var doc = JsonDocument.Parse(File.ReadAllText(FilePath));
             var r = doc.RootElement;
+            
+            int savedVersion = Get(r, "configVersion", 1);
+            
             DeviceId = Get(r, "deviceId", DeviceId);
             DeviceName = Get(r, "deviceName", DeviceName);
             ServerUrl = Get(r, "serverUrl", ServerUrl);
             Port = Get(r, "port", Port);
             DownloadDir = Get(r, "downloadDir", DownloadDir);
             Discovery = Get(r, "discovery", Discovery);
+            
+            // Migration from v1 (local-first) to v2 (cloud-first)
+            if (savedVersion < 2)
+            {
+                // Detect old local-first configs and migrate to cloud defaults
+                var isLocalUrl = ServerUrl.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://192.168.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://10.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.16.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.17.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.17.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.18.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.19.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.20.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.21.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.22.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.22.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.23.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.24.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.25.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.26.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.27.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.28.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.29.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.30.", StringComparison.OrdinalIgnoreCase) ||
+                                ServerUrl.StartsWith("http://172.31.", StringComparison.OrdinalIgnoreCase);
+                
+                if (isLocalUrl || Port <= 4000)
+                {
+                    ServerUrl = "https://transfoo.vercel.app";
+                    Port = 443;
+                }
+                ConfigVersion = CurrentConfigVersion;
+            }
         }
         catch
         {
@@ -74,6 +115,7 @@ public sealed class AppConfig
                 port = Port,
                 downloadDir = DownloadDir,
                 discovery = Discovery,
+                configVersion = CurrentConfigVersion,
             }, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch

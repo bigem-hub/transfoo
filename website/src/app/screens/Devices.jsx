@@ -121,7 +121,7 @@ export default function Devices() {
             <Chip tone={state.paired ? 'ok' : 'default'}>{state.paired ? 'paired' : 'unpaired'}</Chip>
           </div>
           <p className="font-mono text-[11px] text-faint mb-4">{base}</p>
-          <Btn variant="secondary" onClick={requestCode} disabled={busy} className="w-full">
+          <Btn variant="secondary" onClick={requestCode} disabled={busy || !state.ready} className="w-full">
             <Icon name="key" size={14} /> {reqCode ? `Code: ${reqCode}` : 'Request a pairing code'}
           </Btn>
           {reqCode && (
@@ -182,8 +182,8 @@ export default function Devices() {
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium truncate">{d.name}</div>
                   <div className="font-mono text-[11px] text-faint">
-                    {d.ip}:{d.port} · {Math.max(1, Math.round((Date.now() - d.lastSeen) / 1000))}s ago
-                  </div>
+                      {d.ip}:{d.port} · {typeof d.lastSeen === 'number' && d.lastSeen > 0 ? `${Math.max(1, Math.round((Date.now() - d.lastSeen) / 1000))}s ago` : 'just now'}
+                    </div>
                 </div>
               </div>
               <Chip tone="ok">

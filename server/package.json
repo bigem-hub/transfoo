@@ -1,6 +1,6 @@
 {
-  "name": "transfo-server",
-  "version": "1.1.0",
+  "name": "transfo-api",
+  "version": "1.1.1",
   "type": "module",
   "scripts": {
     "start": "node server.js",

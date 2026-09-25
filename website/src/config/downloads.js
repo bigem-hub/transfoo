@@ -5,18 +5,18 @@
  */
 export const downloads = {
   windows: {
-    version: "1.1.0",
+    version: "1.1.1",
     label: "Windows 10 / 11",
     filename: "Transfo-Setup.exe",
     url: "/downloads/Transfo-Setup.exe",
     size: "156 MB",
   },
   android: {
-    version: "1.1.0",
+    version: "1.1.1",
     label: "Android 8.0+",
     filename: "Transfo.apk",
     url: "/downloads/Transfo.apk",
-    size: "17 MB",
+    size: "16.3 MB",
   },
 }
 

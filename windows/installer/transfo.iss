@@ -1,5 +1,5 @@
 ; Transfo 1.1.0 — Inno Setup installer (LZMA2, per-user, no admin required)
-#define AppVersion "1.1.0"
+#define AppVersion "1.1.1"
 
 [Setup]
 AppId={{8E4B1C2A-3F5D-4A7B-9C0D-Transfo110}}
